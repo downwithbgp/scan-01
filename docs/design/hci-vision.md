@@ -9,7 +9,7 @@
 
 ## 1. Why this exists
 
-Racing Electronics owns the race-scanner market. A weekend rental runs $50–80; a "pro" scanner purchase $300–600; the frequency guides are sold separately, every season, per track. The hardware is a cheap FM receiver in a plastic brick. The data is a frequency list. Both can be open.
+Racing Electronics owns the race-scanner market. A weekend rental runs $50–80; a "pro" scanner purchase $300–600; the frequency guides are sold separately, every season, per track. The hardware is a conventional FM receiver in a molded case. The data is a frequency list. Both can be open.
 
 The Quansheng UV-K6 is a $25 commodity radio that already contains everything a race scanner needs:
 

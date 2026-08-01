@@ -7,6 +7,10 @@ the $25 commodity radio is already a race scanner, the firmware and the frequenc
 are free. An **event scanner for every day**: racing is the wedge, daily use drives
 development (vision §1).
 
+**Tone:** we compete on the work, not the insults. Competitors are named only in
+factual comparisons (prices, product behavior); market claims are sourced and
+attributed. No competitor bashing in commits, docs, or code — ever.
+
 - **Design vision:** [docs/design/hci-vision.md](docs/design/hci-vision.md) — the HCI
   reimagination (car-number-first interaction, PTT→HOLD, RACE/PRACTICE modes, the seal,
   HOME via long-EXIT, weekend "packs" of open frequency data). Start here.
