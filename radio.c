@@ -14,6 +14,7 @@
  *     limitations under the License.
  */
 
+/* Modified for Scan 01 — see NOTICE */
 #include "driver/bk4819-regs.h"
 #include <string.h>
 
@@ -860,8 +861,10 @@ void RADIO_SetupRegisters(bool switchToForeground)
     // RX expander
     BK4819_SetCompander((gRxVfo->Modulation == MODULATION_FM && gRxVfo->Compander >= 2) ? gRxVfo->Compander : 0);
 
+#ifndef ENABLE_FEAT_SCAN01
     BK4819_EnableDTMF();
     InterruptMask |= BK4819_REG_3F_DTMF_5TONE_FOUND;
+#endif
 
     RADIO_SetupAGC(gRxVfo->Modulation == MODULATION_AM, false);
 

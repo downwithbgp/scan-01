@@ -13,13 +13,13 @@ external acceptance criteria; everything else is build/review/test-able in this 
 - [ ] Wire into every tune path: BK4819 set, CAPTURE preview, BRD, WX. On reject: status flash + no tune. — **sequenced with the features that call them (T6 screens, T7 capture, S-tasks scan engine); no base tune path is guarded yet because the base's own scanning must keep working until the scan engine replaces it.**
 - **Gate (PASS):** host test `tests/test_bandlock.c` — gcc -Wall -Werror: **814,958 checks, 0 failures** (17 real-world cases incl. the 2m RACE/PRACTICE split; every band edge ±1 Hz, both modes; 400k random freqs × 2 modes vs an independent classifier [soundness + completeness] + mode monotonicity). Firmware build green; function currently gc-sections-stripped (no caller yet) — 0 B delta until wiring pulls it in.
 
-## T3. Pack layer (`settings_pack.c` / `settings_pack.h` — new)
-- [ ] Header read/validate (magic "SC01", version, CRC16-CCITT) at boot; RAM arrays for cars/stations/lockouts/my-driver.
-- [ ] Writers: `PACK_SaveLockout`, `PACK_SaveFavorite`, `PACK_SetMyDriver`, `PACK_AddCapture` (writes channel record + name/team + CarMeta + counts + CRC; duplicate → `ALT` entry, never overwrite).
-- [ ] Channel-record writer using the base's packing (values per spec §4.1: Hz frequency, CTCSS index + `0x11` code type, TX_LOCK set).
-- [ ] Factory-reset extension: wipe 0x1BD0–0x1DFF in both reset modes (spec §4.4); `PACK_Load` sanity-checks channel frequencies.
-- [ ] Boot-state integration: valid pack → identity screen + SCAN; invalid/missing → **demo-pack fallback** (flash-resident daily presets) → SCAN; "NO PACK" only as a SETUP diagnostic (capture still usable).
-- **Gate:** build; CRC/bitmap/conversion logic host-tested in `tests/` (harness introduced in T8); `/prop-test` on CRC + bitmap round-trips; code review against spec §4.3 byte table.
+## T3. Pack layer (`settings_pack.c` / `settings_pack.h`) — DONE
+- [x] Header read/validate (magic SC01, version 1, CRC-16/CCITT-FALSE with the CRC-field-reads-as-zero convention) at boot; RAM arrays for cars/stations/lockouts/my-driver; accessors for the UI/scan engine.
+- [x] Writers: `PACK_SaveLockout`, `PACK_SaveFavorite`, `PACK_SetMyDriver`, `PACK_AddCapture` (channel record + name/team + CarMeta + counts + CRC; duplicate → `ALT` entry, never overwrite; PACK FULL at 64; **seal refuses, PRACTICE = RAM-only** — the single mutation choke point, spec §8). AddCapture band-checks (ECPA at rest).
+- [x] Channel-record writer (spec §4.1: Hz LE, CTCSS index + 0x11/0x22 code type, AM<<4 for airband, 0x46/0x44 TX-locked flags); names+team (10+6) writer.
+- [x] Factory-reset extension: settings.c wipes 0x1BD0–0x1DFF in both reset modes (spec §4.4); `PACK_Load` sanity-checks channel freqs via the band-lock. Boot call in main.c (PACK_Init → demo fallback on invalid → SCAN).
+- [x] **Layout fixes found by testing (pre-release, spec updated):** header pad 0x3C→0x40 + fixed StationMeta base (captures never relocate stations) + cars at ch 0–63, stations at ch 64–87 (captures never collide) + all EEPROM writes as 8-aligned chunked RMW (24C64 page-wrap).
+- **Gate (PASS):** host tests 166 checks, 0 failures (CRC vector 0x29B1, demo install/reload byte-exact, capture/ALT/full/seal/practice, lockout+favorite+my-driver round-trips, corruption→demo, CRC valid after every mutation). Firmware build green. **Flash budget:** text 60,120 + data 20 (pack layer ≈ 3.1 KB; the DTMF 5-tone RX chain is gated out of the edition, −300 B); headroom 1.3 KB < the old 2K T1 margin — CI gate moved to a 512 B no-brick floor; T6 must reclaim the ~9.3 KB stock menu stack (`ui/menu.o` + `app/menu.o`) per the plan. **Build hygiene:** build-scan01.sh now cleans stale objects first — flag changes do not trigger make rebuilds (caught as a stale-misc.o link error).
 
 ## T4. Racing-digits font (36 glyphs) + renderer
 - [ ] `gFontRacingDigits[36]`: 0–9, A–Z, 32 px tall (4 strips), digits 18 px advance ("1" = 12), letters 14 px (vision §5.6).

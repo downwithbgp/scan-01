@@ -20,3 +20,7 @@ Currently modified from the vendored base:
   Makefile
   compile-with-docker.sh
   .github/workflows/main.yml
+  settings.c        (factory reset: wipe the pack table, spec §4.4)
+  main.c            (boot: PACK_Init, spec §8)
+  radio.c           (DTMF 5-tone RX chain gated out of the edition)
+  app/app.c         (DTMF 5-tone RX handler gated out of the edition)

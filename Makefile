@@ -214,6 +214,7 @@ OBJS += main.o
 # ---- Scan 01 edition additions ----
 ifeq ($(EDITION_STRING),Scan01)
 OBJS += pack_bandlock.o
+OBJS += settings_pack.o
 endif
 
 ifeq ($(OS), Windows_NT) # windows

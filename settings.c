@@ -14,6 +14,7 @@
  *     limitations under the License.
  */
 
+/* Modified for Scan 01 — see NOTICE */
 #include <string.h>
 
 #include "app/dtmf.h"
@@ -542,6 +543,15 @@ void SETTINGS_FactoryReset(bool bIsAll)
             EEPROM_WriteBuffer(0x1FF0, Template);
         #endif
     }
+
+    #ifdef ENABLE_FEAT_SCAN01
+        // wipe the pack table (spec §4.4) in BOTH reset modes: the loop above
+        // preserves 0x0F50-0x1C00 (names) and 0x1C00-0x1E00 (DTMF), which cover
+        // the pack region, so a stale header must be cleared explicitly here or
+        // a partial reset would silently resurrect a broken pack
+        for (i = 0x1BD0; i < 0x1E00; i += 8)
+            EEPROM_WriteBuffer(i, Template);
+    #endif
 }
 
 #ifdef ENABLE_FMRADIO

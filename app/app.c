@@ -14,6 +14,7 @@
  *     limitations under the License.
  */
 
+/* Modified for Scan 01 — see NOTICE */
 #include <assert.h>
 #include <stdint.h>
 #include <string.h>
@@ -693,6 +694,7 @@ static void CheckRadioInterrupts(void)
 //      if (ctcss_shift > 0)
 //          g_CTCSS_Lost = true;
 
+#ifndef ENABLE_FEAT_SCAN01
         if (interrupts.dtmf5ToneFound) {    
             const char c = DTMF_GetCharacter(BK4819_GetDTMF_5TONE_Code()); // save the RX'ed DTMF character
             if (c != 0xff) {
@@ -727,6 +729,7 @@ static void CheckRadioInterrupts(void)
                 }
             }
         }
+#endif
 
         if (interrupts.cssTailFound)
             g_CxCSS_TAIL_Found = true;

@@ -76,7 +76,7 @@ Total 8 KB (0x0000–0x1FFF). The pack owns four regions; everything else is eit
 | Settings block | 0x0E28–0x0F4F | ~296 | base gEeprom fields (subset used) |
 | FM broadcast channels | 0x0E40 | — | untouched (BRD presets come from StationMeta) |
 | **Channel names + team** | **0x0F50** | 200×16 | §4.2 — name (10 B, base-compatible) + team (6 B, Scan 01-only) |
-| **Pack table** | **0x1BD0** | ≤ 556 | §4.3 — header + CarMeta + StationMeta |
+| **Pack table** | **0x1BD0** | ≤ 560 | §4.3 — header + CarMeta + StationMeta |
 | DTMF contacts | 0x1C00 | 512 | compiled out in Scan 01; part of pack-table space |
 | Aircopy | 0x1E00 | — | compiled out; keep clear |
 | Calibration / options | 0x1EC0–0x1FFF | 320 | **never written by packtool or the pack layer** |
@@ -122,12 +122,15 @@ off  size  field
 0x23  8     lockout bitmap (bit i = car slot i locked out)
 0x2B  4     my-driver number, ASCII NUL-padded ("24\0\0", "29A\0")
 0x2F  8     venue2 — secondary venue name, ASCII space-padded (≤ 8 chars)
-0x37  2     CRC16-CCITT over bytes 0x00..0x39
+0x37  2     CRC16-CCITT (CCITT-FALSE: poly 0x1021, init 0xFFFF, no reflection) over bytes 0x00..0x39
 0x39  1     pack flags (bit 0 = sealed — RACE refuses all pack mutations; bits 1–7 reserved, 0)
-0x3A  —     pad to 0x3C
-0x3C  n×4   CarMeta[car], n = car count (≤ 64)
-0x3C+4n  m×10  StationMeta[station], m = station count (≤ 24)
+0x3A  6     pad (zero; outside CRC)
+0x40  n×4   CarMeta[car], n = car count (≤ 64) — 8-byte chunks via RMW pairs
+0x140      StationMeta base — FIXED at the end of the car-meta capacity
+      m×10  StationMeta[station], m = station count (≤ 24) — chunked RMW writes
 ```
+
+**Why the alignment (hardware constraint):** the base's `EEPROM_WriteBuffer` writes exactly 8 bytes at any address, and the 24C64 wraps within 32-byte pages — an 8-byte write starting at addr%32 ≥ 25 silently wraps and corrupts the page start. All pack writes therefore land at 8-aligned chunk addresses; records are written read-modify-write, chunk by chunk, only touching the bytes that overlap each chunk. **The StationMeta base is fixed** (0x40 + 4·64) so that a capture growing the car count never shifts the station region. With this layout the table ends at ≤ 0x1DFF for every valid (n, m); the max case (64 cars, 24 stations) ends exactly at 0x1DFF.
 
 **CarMeta (4 B):** `number[3]` ASCII NUL-padded ("24\0", "29A", "100") + `flags[1]`:
 
@@ -153,9 +156,9 @@ off  size  field
 | 6 | media (NBC crew etc.) | BK4819 | yes |
 | 7 | other | BK4819 | yes |
 
-Sizes: header 0x3C (60) + 64×4 (256) + 24×10 (240) = **556 B ≤ 560 B** available. 4 B spare.
+Sizes: header 0x40 (64) + car capacity 4×64 (256) + 24×10 (240) = **560 B**, within the table region 0x1BD0..0x1DFF (the exclusive-end bound is 0x1E00, i.e. a 592 B offset from the base).
 
-The budget is **`60 + 4·n + 10·m ≤ 560`** (n cars, m stations): 64 cars → 24 stations, 36 cars → 35 stations, 26 cars → 39, 0 cars → 50. Multi-event weekends (Brickyard + IRP, Daytona 24 + short track) exceed the caps by design — packtool `compose` reports the trade-off and lets the user trim; v1 can rebalance the caps without a format change.
+The budget is **`64 + 4·n + 10·m ≤ 560`** (n cars, m stations — the station base is fixed, so fewer cars do not shrink the table): 64 cars → 24 stations, 36 cars → 35 stations, 26 cars → 39, 0 cars → 50. Multi-event weekends (Brickyard + IRP, Daytona 24 + short track) exceed the caps by design — packtool `compose` reports the trade-off and lets the user trim; v1 can rebalance the caps without a format change.
 
 **Wear note:** lockout toggles rewrite header bytes 0x23–0x38 (22 bytes, spanning four 8-byte chunks — byte 0x38 falls in its own page). EEPROM endurance (~1M writes) makes this a non-issue at race-day rates; noted for the record.
 
@@ -173,7 +176,7 @@ The base's `SETTINGS_FactoryReset` behavior around the pack table is wrong for u
 
 1. Validate (§6). On error: abort with a report; on warning: proceed and print.
 2. **Flatten cars:** each car with `freqs[1]` produces a second entry `number` (same) + `name = "ALT <last>"` + same tone/group/flags. Array order is preserved; `n = cars + alts ≤ 64`.
-3. **Assign channels:** cars/alts → ch 0..n−1; non-broadcast stations → ch n..n+m−1 (broadcast stations get no channel record). `n ≤ 64`, `m ≤ 24`, `n + m ≤ 88 ≤ 200`. **Entries are ordered by venue — all venue-0 entries, then all venue-1 — so LIST dividers render once each.**
+3. **Assign channels:** cars/alts → ch 0..n−1; non-broadcast stations → **ch 64..64+m−1** (broadcast stations get no channel record). The fixed 64-slot car block means on-radio captures (which append cars) never collide with station records, and load can always derive a car's channel from its index. `n ≤ 64`, `m ≤ 24`, `n + m ≤ 88 ≤ 200`. **Entries are ordered by venue — all venue-0 entries, then all venue-1 — so LIST dividers render once each.**
 4. Write channel records (§4.1 — incl. per-entry bandwidth), names + team (§4.2), pack table (§4.3) with CRC over the header.
 5. Channels beyond `n+m` in 0..79 are zeroed (so a stale pack never half-survives); 80..199 left as-is.
 6. Writes are region-scoped (see §7) — calibration and the settings block are never written by `build`.
@@ -187,7 +190,7 @@ Reverse of §5.1: read pack table (validate magic + CRC; if invalid, report "rad
 - New capture (vision §4.5): write a fresh channel record + name (`ALT <last>` or `NEW` + number) + CarMeta with `origin=1 (captured), verified=0`, update counts + CRC.
 - Duplicate number → append as `ALT` entry (never overwrite, vision §4.5).
 - **Sealed pack**: while the header flags byte has bit 0 set (SETUP → Pack → Seal), every pack mutation — capture save, lockout, favorite, group, my-driver — is refused with a one-line "SEALED" status (vision §4.1). Seal applies only when a pack exists; an empty radio still captures. Unseal is the same deliberate toggle.
-- **Pack full (64 cars)**: CAPTURE save is rejected with a "PACK FULL — dump & trim" status (screen + no write). Capture still works; only persistence is refused.
+- **Pack full (64 cars)**: CAPTURE save is rejected with a "PACK FULL — dump & trim" status (screen + no write). The radio keeps scanning and listening; only the save is refused.
 - Lockout toggle → flip bitmap bit, rewrite header + CRC (persists across reboots — the base keeps lockout in RAM only; this is our fix).
 - Favorite toggle / my-driver change → CarMeta flag / header field, rewrite CRC.
 

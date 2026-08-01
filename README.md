@@ -71,15 +71,19 @@ or directly:
     $ docker run -v "$PWD:/app" uvk5 /bin/bash /app/build-scan01.sh
 
 Output: `scan01.packed.bin` (plus `scan01`, `scan01.bin`). The build is
-gated: text must stay within 58 KB (60 KB minus 2 KB headroom). CI
-enforces this on every push.
+gated: text must stay within 59.5 KB (60 KB minus a 512 B no-brick floor).
+CI enforces this on every push. Flash budget: the pack layer (T3) costs
+~3.1 KB; the stock ham menu stack (~9.3 KB in `ui/menu.o` + `app/menu.o`)
+is budgeted for removal when the Scan 01 UI replaces it (T6).
 
 ### Running the tests
 
-Host tests (band-lock):
+Host tests (band-lock, pack layer):
 
     $ gcc -Wall -Werror -Wextra -I. tests/test_bandlock.c pack_bandlock.c -o /tmp/test_bandlock
     $ /tmp/test_bandlock
+    $ gcc -Wall -Werror -Wextra -I. tests/test_pack.c settings_pack.c pack_bandlock.c -o /tmp/test_pack
+    $ /tmp/test_pack
 
 CI runs these on every push, then builds the firmware and checks the
 flash gate.

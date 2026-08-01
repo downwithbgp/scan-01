@@ -14,6 +14,7 @@
  *     limitations under the License.
  */
 
+/* Modified for Scan 01 — see NOTICE */
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>     // NULL
@@ -27,6 +28,9 @@
 #include "misc.h"
 #include "radio.h"
 #include "settings.h"
+#ifdef ENABLE_FEAT_SCAN01
+#include "settings_pack.h"
+#endif
 #include "version.h"
 
 #ifdef ENABLE_FEAT_F4HWN
@@ -105,6 +109,10 @@ void Main(void)
     BOARD_ADC_GetBatteryInfo(&gBatteryCurrentVoltage, &gBatteryCurrent);
 
     SETTINGS_InitEEPROM();
+
+    #ifdef ENABLE_FEAT_SCAN01
+        PACK_Init();    // pack layer: load, or install the demo pack (spec §8)
+    #endif
 
     #ifdef ENABLE_FEAT_F4HWN
         gDW = gEeprom.DUAL_WATCH;

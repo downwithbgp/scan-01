@@ -6,6 +6,8 @@
 # expose latent unconditional-reference bugs in the base.
 set -e
 cd /app
+# flag changes do not trigger make rebuilds — always clean stale objects
+rm -f *.o app/*.o driver/*.o ui/*.o helper/*.o external/printf/*.o *.d app/*.d driver/*.d ui/*.d helper/*.d external/printf/*.d
 make \
   ENABLE_SPECTRUM=0 \
   ENABLE_FEAT_F4HWN_SPECTRUM=0 \

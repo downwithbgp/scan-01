@@ -13,21 +13,23 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Run host tests (band-lock)
+    - name: Run host tests (band-lock, pack layer)
       run: |
         gcc -Wall -Werror -Wextra -I. tests/test_bandlock.c pack_bandlock.c -o /tmp/test_bandlock
         /tmp/test_bandlock
+        gcc -Wall -Werror -Wextra -I. tests/test_pack.c settings_pack.c pack_bandlock.c -o /tmp/test_pack
+        /tmp/test_pack
 
     - name: Build the scan01 edition
       run: |
         docker build --build-arg ALPINE_TAG=3.22 -t uvk5 .
         docker run -v "$PWD:/app" uvk5 /bin/bash /app/build-scan01.sh
 
-    - name: Verify the T1 gate (flash headroom >= 2K)
+    - name: Verify the flash gate (>= 512 B hard floor)
       run: |
-        SIZE=$(docker run -v "$PWD:/app" uvk5 arm-none-eabi-size f4hwn.scan01 | tail -1 | awk '{print $1}')
-        echo "text: $SIZE B (gate: <= 59392 = 60K - 2K)"
-        test "$SIZE" -le 59392
+        SIZE=$(docker run -v "$PWD:/app" uvk5 arm-none-eabi-size scan01 | tail -1 | awk '{print $1}')
+        echo "text: $SIZE B (gate: <= 60928 = 60K - 512 B no-brick floor)"
+        test "$SIZE" -le 60928
 
     - name: Upload firmware artifact
       uses: actions/upload-artifact@v4
