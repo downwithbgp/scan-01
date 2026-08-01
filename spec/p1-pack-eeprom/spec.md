@@ -52,12 +52,14 @@ Out of scope (later phases): scan-engine tuning (dwell/tone-lock/FOLLOW — P2),
 ```
 
 **Rules:**
-- `number`: 1–3 digits + optional one suffix letter (`"29A"`, `"13F"`). The string is the identity; `"29"` ≠ `"29A"`. No leading zeros.
+- `number`: 1–3 digits + optional one suffix letter (`"29A"`, `"13F"`) — **max 3 chars total** (the binary field is 3 bytes, §4.3). The string is the identity; `"29"` ≠ `"29A"`. No leading zeros.
 - `freqs`: 1–2 entries, MHz decimal, 450.000–470.000 MHz (teams/control) or 162.400–162.550 (NOAA — `kind: noaa` stations only). Broadcast stations use `fm` (88.0–108.0) and have no `freqs`.
-- `tone`: 0 = none, else CTCSS in Hz (67.0–254.1). DCS is rejected with a warning in v0.
+- `tone`: `0` = none · CTCSS in Hz (`94.8`) · **DCS as a zero-padded 3-digit octal string (`"271"`, `"032"`)** — IndyCar mandates a unique DCS/DPL code per car (rulebook 7.4.1.3), so DCS is first-class. Values must exist in the base tables (`CTCSS_Options[50]`, `DCS_Options[104]` — both in dcs.c); packtool maps value → index.
+- `bandwidth`: `"narrow"` (default, 12.5 kHz — IndyCar rulebook 7.4.1.1) or `"wide"`.
 - `group`: `"A" | "B" | "C" | "ALL"` (scan groups). `favorite`: bool. `origin`: `"pack" | "captured" | "manual"`. `verified`: bool.
+- Stations: `kind` is `"broadcast" | "control" | "pa" | "officials" | "safety" | "radio" | "media" | "other"`; `"radio"` covers network feeds on UHF (MRN/PRN — e.g. MRN is 454.2 MHz at IMS, not commercial FM). `"digital": true` flags a feed RaceScan v0 cannot decode (it is listed but skipped by the scan).
 - `lockouts`: array of car numbers currently locked out of the scan.
-- Cap: **≤ 64 cars** (alternate frequencies count as entries, see §5.1) and **≤ 16 stations** (broadcast + non-broadcast).
+- Cap: **≤ 64 cars** (alternate frequencies count as entries, see §5.1) and **≤ 24 stations** (the IMS weekend alone needs 17: PA×3, media×3, radio×4, control×2, safety×2, officials×3).
 
 ## 4. EEPROM layout (RaceScan edition)
 
@@ -71,7 +73,7 @@ Total 8 KB (0x0000–0x1FFF). The pack owns four regions; everything else is eit
 | Settings block | 0x0E28–0x0F4F | ~296 | base gEeprom fields (subset used) |
 | FM broadcast channels | 0x0E40 | — | untouched (BRD presets come from StationMeta) |
 | **Channel names + team** | **0x0F50** | 200×16 | §4.2 — name (10 B, base-compatible) + team (6 B, RaceScan-only) |
-| **Pack table** | **0x1BD0** | ≤ 532 | §4.3 — header + CarMeta + StationMeta |
+| **Pack table** | **0x1BD0** | ≤ 548 | §4.3 — header + CarMeta + StationMeta |
 | DTMF contacts | 0x1C00 | 512 | compiled out in RaceScan; part of pack-table space |
 | Aircopy | 0x1E00 | — | compiled out; keep clear |
 | Calibration / options | 0x1EC0–0x1FFF | 320 | **never written by packtool or the pack layer** |
@@ -86,11 +88,11 @@ RaceScan writes RX-only-safe values:
 |---|---|---|---|
 | +0 | 4 | RX frequency | **u32 LE Hz** (450.8875 MHz → `450887500` = 0x1AE3A94C) — the base stores plain Hz (`SETTINGS_SaveChannel` writes `freq_config_RX.Frequency` raw; cf. `RADIO_InitInfo(..., 43350000)`) |
 | +4 | 4 | TX offset | 0 |
-| +8 | 1 | RX code | **index into `CTCSS_Options[]`** (base table, deci-Hz values; 0 = none). packtool maps Hz → index |
+| +8 | 1 | RX code | **index into `CTCSS_Options[50]` (CT=1) or `DCS_Options[104]` (CT=2)** — both tables in dcs.c; 0 = none. packtool maps Hz/octal → index |
 | +9 | 1 | TX code | same as RX (harmless; TX compiled out) |
-| +10 | 1 | (TX code type << 4) \| RX code type | `0x11` when a tone is set, else `0x00` (`CODE_TYPE_CONTINUOUS_TONE = 1`, dcs.h) — without this the tone is inert (`BK4819_SetCTCSSFrequency` is gated on it, radio.c) |
+| +10 | 1 | (TX code type << 4) \| RX code type | `0x11` CTCSS · `0x22` DCS (`CODE_TYPE_DIGITAL=2`) · `0x00` none — without the type the tone is inert (radio.c gates on it) |
 | +11 | 1 | (modulation << 4) \| offset direction | 0 (FM, offset off) |
-| +12 | 1 | TX_LOCK<<6 \| BUSY_LOCK<<5 \| POWER<<2 \| BW<<1 \| FREV | `0x44` = TX_LOCK(1) + power low(1) |
+| +12 | 1 | TX_LOCK<<6 \| BUSY_LOCK<<5 \| POWER<<2 \| BW<<1 \| FREV | `0x46` = TX_LOCK(1) + power low(1) + **narrow bandwidth(1)** — 12.5 kHz narrowband is mandated by IndyCar rulebook 7.4.1.1; `bandwidth: "wide"` entries clear the BW bit |
 | +13 | 1 | DTMF PTT ID / decode | 0 |
 | +14 | 1 | STEP_SETTING | 0 |
 | +15 | 1 | scrambling (F4HWN: 0) | 0 |
@@ -113,16 +115,16 @@ off  size  field
 0x0D  12    track, ASCII space-padded ("DAYTONA    ")
 0x19  8     session, ASCII space-padded ("RACE    ", "QUALI   ", "PRACT   ")
 0x21  1     car count (1–64)
-0x22  1     station count (0–16)
+0x22  1     station count (0–24)
 0x23  8     lockout bitmap (bit i = car slot i locked out)
 0x2B  4     my-driver number, ASCII NUL-padded ("24\0\0", "29A\0")
 0x2F  2     CRC16-CCITT over bytes 0x00..0x2E
 0x31  —     pad to 0x34
-0x34  n×5   CarMeta[car], n = car count
-0x34+5n  m×10  StationMeta[station], m = station count
+0x34  n×4   CarMeta[car], n = car count (≤ 64)
+0x34+4n  m×10  StationMeta[station], m = station count (≤ 24)
 ```
 
-**CarMeta (5 B):** `number[4]` ASCII NUL-padded ("24\0\0\0", "29A\0", "100\0") + `flags[1]`:
+**CarMeta (4 B):** `number[3]` ASCII NUL-padded ("24\0", "29A", "100") + `flags[1]`:
 
 | bits | field | values |
 |---|---|---|
@@ -132,19 +134,22 @@ off  size  field
 | 5 | verified | 0/1 |
 | 6–7 | reserved | 0 |
 
-**StationMeta (10 B):** `name[4]` ASCII NUL-padded ("MRN\0", "CTRL", "PA\0\0") + `freq[4]` **u32 LE Hz** (broadcast: 101.1 MHz → 101100000; non-broadcast: 461200000) + `tone[1]` (0 = none) + `kind[1]`:
+**StationMeta (10 B):** `name[4]` ASCII NUL-padded ("MRN\0", "CTRL", "PA\0\0") + `freq[4]` **u32 LE Hz** (broadcast: 101.1 MHz → 101100000; non-broadcast: 461200000) + `tone[1]` (bit 7 = DCS flag; bits 0–6 = table index; 0x00 = none) + `kind[1]` (bits 0–2 = kind, bit 3 = digital — digital stations are listed but **skipped by the scan**):
 
 | kind | meaning | RX path | needs channel record |
 |---|---|---|---|
-| 0 | broadcast (MRN/PRN/IMSA Radio) | BK1080 | no |
+| 0 | broadcast (commercial FM — MRN/PRN/IMSA Radio when on FM) | BK1080 | no |
 | 1 | race control | BK4819 | yes |
 | 2 | track PA | BK4819 | yes |
 | 3 | officials | BK4819 | yes |
-| 4 | other | BK4819 | yes |
+| 4 | safety | BK4819 | yes |
+| 5 | radio network (MRN/PRN on UHF, e.g. MRN 454.2 at IMS) | BK4819 | yes |
+| 6 | media (NBC crew etc.) | BK4819 | yes |
+| 7 | other | BK4819 | yes |
 
-Sizes: header 0x34 (52) + 64×5 (320) + 16×10 (160) = **532 B ≤ 560 B** available. 28 B spare.
+Sizes: header 0x34 (52) + 64×4 (256) + 24×10 (240) = **548 B ≤ 560 B** available. 12 B spare.
 
-**Wear note:** lockout toggles rewrite header bytes 0x23–0x30 (two 8-byte pages). EEPROM endurance (~1M writes) makes this a non-issue at race-day rates; noted for the record.
+**Wear note:** lockout toggles rewrite header bytes 0x23–0x30 (14 bytes, spanning three 8-byte chunks). EEPROM endurance (~1M writes) makes this a non-issue at race-day rates; noted for the record.
 
 ### 4.4 Factory reset (edition change required)
 
@@ -160,8 +165,8 @@ The base's `SETTINGS_FactoryReset` behavior around the pack table is wrong for u
 
 1. Validate (§6). On error: abort with a report; on warning: proceed and print.
 2. **Flatten cars:** each car with `freqs[1]` produces a second entry `number` (same) + `name = "ALT <last>"` + same tone/group/flags. Array order is preserved; `n = cars + alts ≤ 64`.
-3. **Assign channels:** cars/alts → ch 0..n−1; non-broadcast stations → ch n..n+m−1 (broadcast stations get no channel record). `n + m ≤ 80 ≤ 200`.
-4. Write channel records (§4.1), names + team (§4.2), pack table (§4.3) with CRC over the header.
+3. **Assign channels:** cars/alts → ch 0..n−1; non-broadcast stations → ch n..n+m−1 (broadcast stations get no channel record). `n ≤ 64`, `m ≤ 24`, `n + m ≤ 88 ≤ 200`.
+4. Write channel records (§4.1 — incl. per-entry bandwidth), names + team (§4.2), pack table (§4.3) with CRC over the header.
 5. Channels beyond `n+m` in 0..79 are zeroed (so a stale pack never half-survives); 80..199 left as-is.
 6. Writes are region-scoped (see §7) — calibration and the settings block are never written by `build`.
 
@@ -183,9 +188,9 @@ Hard errors:
 - number format (1–3 digits + optional letter), duplicates (after flattening; `ALT` entries exempt via `freqs[1]`), leading zeros.
 - frequency outside RX bands: 450.000–470.000 / 162.400–162.550 / 88.0–108.0 (broadcast only).
 - **cellular band-lock (ECPA): 824–894, 1710–1755, 1850–1990, 2110–2155 MHz → hard reject, always.**
-- counts > 64 cars / 16 stations; name > 10 chars or team > 6 after composition (unless auto-truncated with warning); tone outside CTCSS range; station name > 4 chars.
+- counts > 64 cars / 24 stations; name > 10 chars or team > 6 after composition (unless auto-truncated with warning); tone not in `CTCSS_Options` / `DCS_Options`; station name > 4 chars.
 
-Warnings: DCS tone (v0 unsupported), number collides with a station name, missing driver/team fields, unverified pack (`verified: false` on the pack meta is fine — only entries carry the flag).
+Warnings: duplicate frequency across entries (IndyCar rulebook 7.4.1.2 requires unique per-car freqs — flag, don't fail), number collides with a station name, digital station (not monitorable by RaceScan v0 — the scan skips it), missing driver/team fields, unverified pack (`verified: false` on the pack meta is fine — only entries carry the flag).
 
 ## 7. packtool v0 contract
 
@@ -194,6 +199,7 @@ Python CLI (stdlib + `pyserial`), no firmware knowledge needed by users:
 | Command | Behavior |
 |---|---|
 | `packtool validate pack.json` | §6 checks; exit code 0/1/2 (ok/warnings/errors) |
+| `packtool import <file> <format>` | parse a published frequency list into pack.json (first parser: `indyspeedway` text format; fixture: `race-packs/indyspeedway-ims-2026/source.txt`, expected output: the checked-in draft `pack.json`) |
 | `packtool build pack.json` | emits `pack.patch` — ordered list of `(addr, bytes)` region writes (§5.1) + human-readable summary |
 | `packtool flash <port> pack.json` | `build` then apply over UART, region-scoped |
 | `packtool dump <port>` | §5.2 → `pack.json` (plus a full `eeprom.bin` backup, k5prog-style) |
@@ -208,7 +214,7 @@ packtool *never* writes outside the pack-owned regions (§4); `dump` reads every
 
 ## 8. Firmware pack layer (settings_pack.c — new)
 
-- `PACK_Load()` at boot: read header, validate magic + CRC, populate RAM arrays (`PackCar[64]`, `PackStation[16]`, lockout bitmap, my-driver). Failure → "NO PACK" boot state (capture still works).
+- `PACK_Load()` at boot: read header, validate magic + CRC, populate RAM arrays (`PackCar[64]`, `PackStation[24]`, lockout bitmap, my-driver). Failure → "NO PACK" boot state (capture still works).
 - `PACK_SaveLockout(i)`, `PACK_SaveFavorite(i)`, `PACK_SetMyDriver()`, `PACK_AddCapture(entry)` — each writes the minimal region + CRC.
 - Boot screen (vision §5.8) renders series/track/session + car count from the header.
 - Band-lock: a single filter function `PACK_FreqAllowed(freq)` used by every tune path (BK4819 set, CAPTURE, BRD, WX) — single point of enforcement.
@@ -218,7 +224,7 @@ packtool *never* writes outside the pack-owned regions (§4); `dump` reads every
 1. Name composition (`"BYRON W"` / `"ALT BYRON"`) — does the initial help or confuse at the track? (Vision says the first name lives in LIST; v0 device shows initial only.)
 2. 64-car cap vs. IMSA's 50+ entries with alts — is 64 enough per weekend, or should v1 raise it (channels 80–199 are free; the cap is pack-table size)?
 3. Team truncation to 6 chars — acceptable, or should the SCAN team line go away entirely?
-4. Is CTCSS-only (no DCS) a real gap for any series? (NASCAR/IMSA/IndyCar are CTCSS-heavy; DCS rare.)
+4. ~~Is CTCSS-only a real gap?~~ **Resolved by P0 data (indyspeedway-ims-2026):** IndyCar mandates DCS/DPL unique per car (rulebook 7.4.1.3) — DCS is first-class in the spec. Follow-up: digital race-control feeds (e.g. IMS Safety 2 on 461.4250) — accept as flagged-and-skipped in v0?
 5. CHIRP coexistence priority: do we *need* CHIRP to write packs, or is packtool the only writer (CHIRP remains read-only-compatible)?
 
 ## 10. What this spec deliberately does NOT decide

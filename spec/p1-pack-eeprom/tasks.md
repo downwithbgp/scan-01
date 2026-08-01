@@ -48,9 +48,10 @@ external acceptance criteria; everything else is build/review/test-able in this 
 
 ## T8. packtool v0 (Python)
 - [ ] `validate` (§6 rules incl. ECPA band-lock), `build` → `pack.patch` region list, `diff`.
-- [ ] Introduce the host test harness: `tests/` with pytest for pure functions (Hz↔MHz, name/team composition/truncation, CTCSS Hz↔index, bitmap packing, CRC16) — the firmware tasks T2/T3 mirror these.
+- [ ] Introduce the host test harness: `tests/` with pytest for pure functions (Hz↔MHz, name/team composition/truncation, CTCSS/DCS value↔index against the dcs.c tables, bitmap packing, CRC16) — the firmware tasks T2/T3 mirror these.
+- [ ] `import` command (first parser: `indyspeedway` text format; fixture `race-packs/indyspeedway-ims-2026/source.txt` → semantically matches the checked-in draft `pack.json`).
 - [ ] `dump` + `flash` over the base UART protocol (pin framing against `driver/uart.c` + CHIRP driver in this task; 8-byte chunked writes).
-- **Gate:** `pytest` green; `packtool validate` on a real sample pack (P0 data) exits 0; build→dump round-trip on a fixture EEPROM image is semantically identical (same cars/stations/lockouts/flags; byte-level equality not required — `ALT` entries are reconstructed best-effort, spec §5.2).
+- **Gate:** `pytest` green; `packtool validate` on a real sample pack (P0 data) exits ≤ 1 (no errors — the draft pack intentionally carries a duplicate-frequency warning); build→dump round-trip on a fixture EEPROM image is semantically identical (same cars/stations/lockouts/flags; byte-level equality not required — `ALT` entries are reconstructed best-effort, spec §5.2).
 
 ## T9. Integration pass
 - [ ] Boot → SCAN → HOLD → capture → save → reboot → lockout persists → dump → pack round-trip.

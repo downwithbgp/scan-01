@@ -1,0 +1,112 @@
+# Fixture: IMS scanner frequencies (extract)
+
+Source: indyspeedway.com — "SCANNER FREQUENCYS" page (2026 season, "Updated March 5, 2026").
+Extracted for packtool `import` parser development and P0 validation.
+Sourcing rule: public webpage; frequencies are facts; attribution in pack README.
+
+NOTE: This is a curated extract of the flattened page tables (original column order
+preserved per block). Pairing car# <-> driver <-> freq is the import parser's job.
+Known source quirks: INDY NXT lists 26 car numbers vs 24 driver/freq entries;
+Xfinity lists car 87 twice; IndyCar 2026 block has no tone column on the page.
+
+---
+
+## INDY NXT 2026 (Speedway Frequencies)
+
+CAR #: 2 3 4 5 6 7 8 9 10 12 14 15 18 19 20 21 26 27 28 30 45 47 60 66 76 77
+DRIVER: Nicholas Monteiro James Roe Bryce Aron Niels Koolen Carson Etter Max Garcia
+        Alessandro De Tullio Nicolas Stati Salvador De Alba Matteo Nannini Nikita Johnson
+        Lochie Hughes Seb Murray Max Taylor Josh Pierson Jack Beeton Jordan Missig
+        Colin Kaminsky Enzo Fittipaldi JM Correa Tymek Kucharczyk Aleander Koreiba
+        Ricardo Escotto Myles Rowe
+PRIMARY: 460.8000 466.1125 452.7000 466.1000 466.3750 463.7750 460.9000 460.0125 460.1000
+         453.4125 463.1625 469.5375 464.5375 462.9125 469.8375 460.2000 454.7875 467.1625
+         460.3000 460.6125 460.4000 462.0125 464.0125 467.2375
+RACE CONTROL PRIMARY: 450.7500 (SubTone)
+
+## 2026 IndyCar (clean block: 26 cars, primary only)
+
+CAR#: 2 3 4 5 6 7 8 9 10 12 14 15 18 19 20 21 26 27 28 30 45 47 60 66 76 77
+DRIVER: Josef Newgarden Scott McLaughlin Caio Collet Pato O'Ward Nolan Siegel
+        Christian Lundgaard Kyffin Simpson Scott Dixon Alex Palou David Malukas
+        Santino Ferrucci Graham Rahal Romain Grosjean Dennis Hauger Alexander Rossi
+        Chris Rasmussen Will Power Kyle Kirkwood Marcus Ericsson Devlin DeFrancesco
+        Louis Foster Mick Schumacher Felix Rosenqvist Marcus Armstrong Rinus Veekay
+        Sting Ray Robb
+PRIMARY: 464.9250 466.8250 463.0125 460.5625 460.6625 460.7625 457.0250 456.6500 467.0375
+         466.2125 467.0750 466.9125 467.2000 463.6000 469.1125 469.9250 464.3000 468.4875
+         469.3000 468.2625 466.3125 468.2625 461.0750 452.8000 458.1000 459.6500
+NOTE: page shows no tone column for the 2026 field; IndyCar rulebook 7.4.1.3 mandates
+DCS/DPL per car — tones must be captured at the track (P0).
+
+## IMS stations (Indy 500 weekend)
+
+IMS P.A.:          450.4375 450.6375 450.6875
+NBC:               450.1625
+NBC (crew):        450.3625 450.1250
+INDYCAR RADIO:     450.2875 450.0750 454.0000 450.7375
+RACE CONTROL:      468.8250 (tone 103.5)  467.0125 (tone 032)
+SAFETY 2:          461.4250 (digital)
+IMS SAFETY 1:      451.6875 (tone 365)
+RACE DIRECTOR:     464.1750 (tone 85.4)
+INDYCAR OFFICIALS: 468.8125 (tone 546)
+INDYCAR OBSERVERS: 469.3625
+NOTE: 454.0000 noted "analog with interference" on the page.
+
+## 2026 NASCAR Cup (IMS)
+
+CAR#: 1 2 3 4 5 6 7 8 9 10 11 12 16 17 19 20 21 22 23 24 34 35 38 41 42 43 45 47 48 51 54 60 71 77 88 97
+DRIVER: Ross Chastain Austin Cindric Austin Dillon Noah Gragson Kyle Larson Brad Keselowski
+        Daniel Suarez Kyle Busch Chase Elliot Ty Dillon Denny Hamlin Ryan Blaney AJ Allmendinger
+        Chris Buescher Chase Briscoe Christopher Bell Josh Berry Joey Logano Bubba Wallace
+        William Byron Todd Gilliland Riley Herbst Zane Smith Cole Custer John H. Nemechek Erik Jones
+        Tyler Reddick Ricky Stenhouse Jr. Alex Bowman Cody Ware Ty Gibbs Ryan Preece Michael McDowell
+        Carson Hocevar Connor Zilsch Shane Gisbergen
+PRIMARY: 463.2375 464.1875 469.0125 468.6500 465.8625 466.2750 469.5875 468.6000 461.9875 465.1125
+         467.4750 464.7000 467.9875 460.9500 458.1750 466.0125 465.8875 464.8250 463.0875 453.0500
+         467.1125 458.9000 463.3125 469.1375 460.1625 463.3375 467.5375 457.6500 451.2000 466.2250
+         467.4500 468.9500 459.0375 458.2125 465.3875 463.8250
+TEAM: Trackhouse Racing Team Penske Richard Childress Racing Front Row Motorsports Hendrick Motorsports
+      RFK Racing Spire Motorsports Richard Childress Racing Hendrick Motorsports Kaulig Racing
+      Joe Gibbs Racing Team Penske Kaulig Racing RFK Racing Joe Gibbs Racing Joe Gibbs Racing
+      Wood Brothers Racing Team Penske 23XI Racing Hendrick Motorsports Front Row Motorsports
+      23XI Racing Front Row Motorsports Haas Factory Team Legacy Motor Club Legacy Motor Club
+      23XI Racing HYAK Motorsports Hendrick Motorsports Rick Ware Racing Joe Gibbs Racing RFK Racing
+      Spire Motorsports Spire Motorsports Trackhouse Racing Trackhouse Racing
+
+## NASCAR non-charter (IMS)
+
+CAR#: 36 40 44 62 67 78 84 99
+DRIVER: Chandler Smith Justin Allgaier JJ Yeley Anthony Alfredo Corey Heim BJ McLeod Jimmie Johnson Corey LaJoie
+PRIMARY: 468.6625 457.8875 456.7750 451.3250 467.8125 467.7500 460.2375 453.7375
+SECONDARY: 456.7625 467.9750 458.3750 466.0125 456.1375 465.0375 453.7250 457.1750
+TEAM: Front Row Motorsports JR Motorsports NY Racing Team Beard Motorsports 23XI Racing
+      Live Fast Motorsports Legacy Motor Club RFK Racing
+
+## NASCAR O'Reilly Auto Parts (Xfinity) Series
+
+CAR#: 00 1 02 2 5 7 8 17 18 19 20 21 24 25 26 27 28 31 32 39 41 44 45 48 51 54 87 96 87 99
+DRIVER: Sheldon Creed Carson Kvapil Ryan Ellis Jesse Love Luke Fenhaus Justin Allgaier Sammy Smith
+        Corey Day William Sawalich Brent Crews Brandon Jones Austin Hill Harrison Burton Nick Sanchez
+        Dean Thompson Jeb Burton Kyle Sieg Blaine Perkins Rajah Caruth Ryan Sieg Sam Mayer Brennan Poole
+        Lavar Scott Patrick Staropoli Jeremy Clements Taylor Gray Josh Bilicki Anthony Alfredo Austin Green
+        Parker Retzlaff
+PRIMARY: 468.2875 468.9125 456.1500 469.2375 458.0250 468.8625 462.7875 457.9875 464.7875
+         461.8625 456.8625 453.0750 468.8250 452.0250 459.3725 452.0875 467.1750 466.3375 457.0125
+         451.3750 453.3750 462.9500 468.5375 469.1875 464.7000 466.3125 453.0250 465.7250 460.1000
+
+## NASCAR IMS channels
+
+NASCAR #1      461.2000
+NASCAR #2      464.6000
+NASCAR #3      451.5750
+Fire / Safety  451.2250
+MRN Radio      454.2000
+MRN Radio      454.0000
+
+## Scanner essay (excerpt — supports the vision doc's market claim)
+
+"R.E. stopped coming to Indy, leaving all their Speedway and IndyCar customers without
+a means to update their frequencies. (The R.E. company used to sell scanners at the
+speedway that were not user programmable.)"
+

@@ -15,7 +15,7 @@ The Quansheng UV-K6 is a $25 commodity radio that already contains everything a 
 
 | Need | UV-K6 hardware |
 |---|---|
-| Team comms, race control, officials (450–470 MHz analog FM, CTCSS) | BK4819 FM RX, full coverage |
+| Team comms, race control, officials (450–470 MHz analog FM, CTCSS/DCS) | BK4819 FM RX, full coverage |
 | MRN / PRN / IMSA Radio (commercial FM) | BK1080 FM broadcast RX (dedicated chip; on models without it the BRD feature is compiled out) |
 | Weather / rain delays (NOAA 162 MHz) | Wide RX covers 162.400–162.550 |
 | Direct car-number entry | Full 16-key front keypad |
@@ -25,6 +25,8 @@ The Quansheng UV-K6 is a $25 commodity radio that already contains everything a 
 The firmware is the product. The frequency data is the product. The radio is a commodity. That inverts RE's business model: they sell the radio + the data + the markup; we give away the software and the data and let fans keep using the $25 radio they may already own (or that costs less than one weekend of rentals).
 
 **The disruption thesis is not a cheaper scanner. It is a free scanner that already exists inside a cheap radio.**
+
+The incumbents are already abandoning the market: "R.E. stopped coming to Indy, leaving all their Speedway and IndyCar customers without a means to update their frequencies" (indyspeedway.com scanner page, 2026; quoted in `race-packs/indyspeedway-ims-2026/source.txt`). A market that stopped being served is a market ready to be opened.
 
 ---
 
@@ -334,7 +336,8 @@ Pack {
            season: 2026, date: "2026-02-15", author, version },
   cars:  [ { number: "24", driver: "William Byron", team: "Hendrick Motorsports",
              entry: "HMS · CHEVY", freqs: [450.8875, 451.1125],
-             tone: 94.8, group: "A", favorite: true, origin: "pack", verified: true },
+             tone: 94.8,  // CTCSS Hz, or DCS as an octal string: "271" (IndyCar mandates DCS)
+             group: "A", favorite: true, origin: "pack", verified: true },
            ... { number: "29A", driver: "…", … } ],
   stations: [ { name: "RACE CTRL",  freq: 461.200, tone: 0 },
               { name: "MRN",        fm: 101.1 },            // broadcast radio
@@ -347,7 +350,7 @@ Pack {
 - Cars map to memory-channel slots; the *car number* is the channel identity — the frequency is just an attribute. (This inverts the stock mental model where a channel is a frequency.)
 - Car numbers are alphanumeric strings: 1–3 digits plus an optional suffix letter ("29A", "13F"). The number string is the identity — "29" and "29A" are different cars with different entries.
 - Cars with multiple freqs (primary/secondary) appear as **separate flat entries** — `24 BYRON` and `24 ALT · BYRON` — exactly how RE-style packs list alternates. No multi-freq UI complexity anywhere; the pack decides. (A v1 refinement may collapse them into one entry with an alt shown in HOLD.)
-- Tones (CTCSS) are *data*, not settings. Outside the CAPTURE screen (§5.9) the fan never sees them — there, the captured tone is shown as confirmation of what gets saved, not as a configuration value.
+- Tones (CTCSS *and* DCS — IndyCar mandates a unique DCS/DPL code per car, rulebook 7.4.1.3) are *data*, not settings. Outside the CAPTURE screen (§5.9) the fan never sees them — there, the captured tone is shown as confirmation of what gets saved, not as a configuration value.
 - Every entry carries `origin` (`pack` \| `captured` \| `manual`) and `verified` (`true`/`false`). Pack entries ship verified by their author; on-radio captures are born `captured`/`false` and are upgraded only when someone confirms them at the track. This is the raw material of the data pipeline (§6.2).
 
 ### 6.2 Open data is the moat-buster
@@ -377,7 +380,7 @@ Most of the *experience* is the scan engine, and it must be tuned for racing, no
 
 - **Dwell:** racing chatter is bursts of 2–10 s with gaps. Dwell should be short (~1.5–2 s) with fast resume after a gap — the F4HWN/egzumer fast-scan work is the starting point.
 - **No squelch crash:** mute/unmute must be click-free (audio ramp), or the radio sounds broken in a quiet grandstand.
-- **Signal-based landing:** decide "this car is talking" on signal + tone-lock (CTCSS match), not just squelch — so a car with an open mic doesn't monopolize the scan (RE scanners do tone-lock natively; we get it from the BK4819's CTCSS decoder).
+- **Signal-based landing:** decide "this car is talking" on signal + tone-lock (CTCSS/DCS match), not just squelch — so a car with an open mic doesn't monopolize the scan (RE scanners do tone-lock natively; we get it from the BK4819's tone decoder).
 - **FOLLOW mode (v1):** your favorite car is priority — the scan returns to it after any other car's transmission ends. "I want to hear everyone, but never miss the 24."
 - **Adaptive per-car squelch (v1):** packtool stores per-car noise-floor offsets so a weak car doesn't get drowned by a strong neighbor; tuned from a "calibrate at the track" pass in LIST.
 
@@ -454,4 +457,4 @@ The base is a fork of the F4HWN lineage (Apache-2.0) and already has the right s
 4. **Data curation.** Frequency lists drift season to season; bad packs make the radio useless at the worst moment. The `race-packs` repo needs a verification workflow and honest "unverified" labeling.
 5. **Legal.** RX-only by design; US scanner law permits listening to the racing/broadcast bands. Two hard rules: (a) we must *never* ship a path to TX on team/business frequencies (the base codebase is TX-capable — the edition must strip it, not hide it); (b) the K6's wide RX includes US cellular bands, and receiving cellular audio is a felony (18 U.S.C. §2511 / ECPA) — the edition must band-lock cellular ranges (824–894, 1710–1755, 1850–1990, 2110–2155 MHz) so the radio physically cannot tune them.
 6. **Naming.** "RaceScan" is a working title; there are existing products/apps with similar names. Trademark check before any branding.
-7. **Open questions for the community:** should packs be per-series (NASCAR-only) or multi-series? Should the long-0 BRD action also receive *track PA* (which at some tracks is AM broadcast)? Is FOLLOW mode a favorite-car priority or should fans pick any car? — all answerable in P0 validation.
+7. **Open questions for the community:** should packs be per-series (NASCAR-only) or multi-series? Should the long-0 BRD action also receive *track PA* (which at some tracks is AM broadcast)? Is FOLLOW mode a favorite-car priority or should fans pick any car? Are the digital race-control feeds (e.g. IMS Safety 2, 461.4250) a gap we accept in v0? — all answerable in P0 validation.
