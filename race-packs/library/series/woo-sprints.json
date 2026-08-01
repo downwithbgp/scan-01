@@ -1,0 +1,33 @@
+{
+  "series": "World of Outlaws Sprint Cars",
+  "kind": "series-stations",
+  "source": "RadioReference Wiki — \"World of Outlaws - Sprint Cars\" (last edited 2025-10-20)",
+  "updated": "2025-10-20",
+  "notes": "WoO does not allow driver<->pit team comms; the raceceiver channel is the product for fans.",
+  "stations": [
+    { "name": "RC",  "kind": "control", "freq": 451.925, "tone": "731",
+      "verified": true, "verified_date": "2025-10-17",
+      "notes": "WoO officials (race control). Everything transmitted on 454.000 is also transmitted here." },
+    { "name": "RXR", "kind": "control", "freq": 454.000, "tone": 0,
+      "verified": true, "verified_date": "2025-10-17",
+      "notes": "CSQ. Raceceiver: all drivers required to monitor during hot-laps, qualifying, racing (cautions, line-up, safety directions)." },
+    { "name": "PA",  "kind": "pa", "freq": 454.500, "tone": 0,
+      "verified": false,
+      "notes": "Johnny Gibson PA audio — some sources list it; not heard 2025-10-17 at Putnamville." },
+    { "name": "WOO1", "kind": "other", "freq": 452.0250, "tone": 0, "verified": false,
+      "notes": "Unconfirmed, from the WoO website archive." },
+    { "name": "WOO2", "kind": "other", "freq": 452.4000, "tone": 0, "verified": false,
+      "notes": "Unconfirmed, from the WoO website archive." },
+    { "name": "WOO3", "kind": "other", "freq": 452.6250, "tone": 0, "verified": false,
+      "notes": "Unconfirmed, from the WoO website archive." },
+    { "name": "WOO4", "kind": "other", "freq": 452.8000, "tone": 0, "verified": false,
+      "notes": "Unconfirmed, from the WoO website archive." },
+    { "name": "WOO5", "kind": "other", "freq": 451.8750, "tone": 0, "verified": false,
+      "notes": "Unconfirmed, from the WoO website archive." },
+    { "name": "WOO6", "kind": "other", "freq": 452.3000, "tone": 0, "verified": false,
+      "notes": "Unconfirmed, from the WoO website archive." },
+    { "name": "WOO7", "kind": "other", "freq": 451.9000, "tone": 0, "verified": false,
+      "notes": "Unconfirmed, from the WoO website archive." }
+  ],
+  "track_guidance": "Dirt-track frequencies live in 151-160 MHz and 451-470 MHz (itinerant). Track-specific freqs belong in event packs (per track), sourced from FCC license databases / RadioReference, field-verified per the library rules."
+}

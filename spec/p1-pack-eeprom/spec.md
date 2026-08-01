@@ -21,6 +21,7 @@ Out of scope (later phases): scan-engine tuning (dwell/tone-lock/FOLLOW — P2),
 ## 2. Non-goals & hard constraints
 
 - **RX-only, always** (vision §7): channel records are written with TX locked; TX paths compiled out; band-lock table rejects cellular ranges (ECPA §2511).
+- **The library is not in the radio:** the radio holds one weekend's subset (≤ 64 cars / ≤ 24 stations, §4.3); the full per-series/per-track library lives in `race-packs/library/` and is assembled by packtool `compose` (§7).
 - **Never touch calibration**: EEPROM 0x1EC0–0x1FFF (RSSI cal, battery cal, VOX, build options) is read-only for packtool and the pack layer.
 - **No VFO/frequency mode**: VFO slots (0x0C80–0x0D5F) stay factory; freq entry exists only as the CAPTURE path.
 - **CHIRP coexistence**: channel records keep the base 16-byte format and 10-char names, so existing CHIRP/k5prog tooling still reads frequencies and names. RaceScan metadata lives in regions CHIRP never touches.
@@ -53,7 +54,7 @@ Out of scope (later phases): scan-engine tuning (dwell/tone-lock/FOLLOW — P2),
 
 **Rules:**
 - `number`: 1–3 digits + optional one suffix letter (`"29A"`, `"13F"`) — **max 3 chars total** (the binary field is 3 bytes, §4.3). The string is the identity; `"29"` ≠ `"29A"`. No leading zeros.
-- `freqs`: 1–2 entries, MHz decimal, 450.000–470.000 MHz (teams/control) or 162.400–162.550 (NOAA — `kind: noaa` stations only). Broadcast stations use `fm` (88.0–108.0) and have no `freqs`.
+- `freqs`: 1–2 entries, MHz decimal, 450.000–470.000 MHz (teams/control) or 162.400–162.550 (NOAA — `kind: noaa` stations only). Broadcast stations use `fm` (88.0–108.0) and have no `freqs`. Station `freq` may additionally be **151.000–160.000 MHz** (VHF dirt-track PA/operations — WoO track guidance).
 - `tone`: `0` = none · CTCSS in Hz (`94.8`) · **DCS as a zero-padded 3-digit octal string (`"271"`, `"032"`)** — IndyCar mandates a unique DCS/DPL code per car (rulebook 7.4.1.3), so DCS is first-class. Values must exist in the base tables (`CTCSS_Options[50]`, `DCS_Options[104]` — both in dcs.c); packtool maps value → index.
 - `bandwidth`: `"narrow"` (default, 12.5 kHz — IndyCar rulebook 7.4.1.1) or `"wide"`.
 - `group`: `"A" | "B" | "C" | "ALL"` (scan groups). `favorite`: bool. `origin`: `"pack" | "captured" | "manual"`. `verified`: bool.
@@ -149,6 +150,8 @@ off  size  field
 
 Sizes: header 0x34 (52) + 64×4 (256) + 24×10 (240) = **548 B ≤ 560 B** available. 12 B spare.
 
+The budget is **`52 + 4·n + 10·m ≤ 560`** (n cars, m stations): 64 cars → 25 stations max, 36 cars → 36 stations, 26 cars → 40, 0 cars → 50. Multi-event weekends (Brickyard + IRP, Daytona 24 + short track) exceed the caps by design — packtool `compose` reports the trade-off and lets the user trim; v1 can rebalance the caps without a format change.
+
 **Wear note:** lockout toggles rewrite header bytes 0x23–0x30 (14 bytes, spanning three 8-byte chunks). EEPROM endurance (~1M writes) makes this a non-issue at race-day rates; noted for the record.
 
 ### 4.4 Factory reset (edition change required)
@@ -186,7 +189,7 @@ Reverse of §5.1: read pack table (validate magic + CRC; if invalid, report "rad
 
 Hard errors:
 - number format (1–3 digits + optional letter), duplicates (after flattening; `ALT` entries exempt via `freqs[1]`), leading zeros.
-- frequency outside RX bands: 450.000–470.000 / 162.400–162.550 / 88.0–108.0 (broadcast only).
+- frequency outside RX bands: cars 450.000–470.000; stations 450.000–470.000 / 162.400–162.550 / **151.000–160.000 (VHF dirt-track)**; broadcast 88.0–108.0.
 - **cellular band-lock (ECPA): 824–894, 1710–1755, 1850–1990, 2110–2155 MHz → hard reject, always.**
 - counts > 64 cars / 24 stations; name > 10 chars or team > 6 after composition (unless auto-truncated with warning); tone not in `CTCSS_Options` / `DCS_Options`; station name > 4 chars.
 
@@ -200,6 +203,8 @@ Python CLI (stdlib + `pyserial`), no firmware knowledge needed by users:
 |---|---|
 | `packtool validate pack.json` | §6 checks; exit code 0/1/2 (ok/warnings/errors) |
 | `packtool import <file> <format>` | parse a published frequency list into pack.json (first parser: `indyspeedway` text format; fixture: `race-packs/indyspeedway-ims-2026/source.txt`, expected output: the checked-in draft `pack.json`) |
+| `packtool compose events.json` | assemble a weekend pack: load event packs + library series stations (`race-packs/library/series/`), merge + dedupe by frequency, report the capacity trade-off (§4.3) when caps are exceeded with trim options |
+| `packtool library list [series\|track]` | list library stations matching a series/track (drives the desktop app's picker) |
 | `packtool build pack.json` | emits `pack.patch` — ordered list of `(addr, bytes)` region writes (§5.1) + human-readable summary |
 | `packtool flash <port> pack.json` | `build` then apply over UART, region-scoped |
 | `packtool dump <port>` | §5.2 → `pack.json` (plus a full `eeprom.bin` backup, k5prog-style) |
