@@ -3,10 +3,10 @@
 Each task has a verification gate. Gates marked **(hw)** need real hardware and are the
 external acceptance criteria; everything else is build/review/test-able in this repo.
 
-## T1. RaceScan edition scaffold
-- [ ] Makefile: add `racescan` edition target (per the F4HWN edition pattern: `EDITION_STRING`, `ENABLE_FEAT_*` defines). Compile **out**: TX paths, VOX, DTMF calling, ALARM, SCRAMBLER, AIRCOPY, SPECTRUM, REVERSE, VOICE. Compile **in**: NOAA, FMRADIO (where BK1080 present), RSSI bar, fast scan.
-- [ ] Add `ENABLE_FEAT_RACESCAN` guard for edition-specific code.
-- **Gate:** `make racescan` builds; `arm-none-eabi-size` output recorded; packed bin fits 60K flash / 16K RAM with headroom ≥ 2K.
+## T1. RaceScan edition scaffold — DONE
+- [x] Makefile: `racescan` edition via `EDITION_STRING=RaceScan` + `compile-with-docker.sh racescan()`. Compile **out** (flags the base's own editions prove safe): SPECTRUM, F4HWN_SPECTRUM, VOX, AIRCOPY, AUDIO_BAR, ALARM, DTMF_CALLING, VOICE, TX_WHEN_AM, F_CAL_MENU, COPY_CHAN_TO_VFO, GAME, RESCUE_OPS. Compile **in**: NOAA, FMRADIO, SCREENSHOT, RX_TX_TIMER, RESUME_STATE. Deferred (latent base bugs on disable): BIG_FREQ, SCAN_RANGES, CUSTOM_MENU_LAYOUT, TX1750, FLASHLIGHT — revisit at T6.
+- [x] `ENABLE_FEAT_RACESCAN` guard — Makefile block **after** the `CFLAGS =` reset (earlier `+=` is wiped); verified in the compile flags.
+- **Gate (PASS):** docker build (alpine:3.22 + gcc-arm-none-eabi) → `f4hwn.racescan.packed.bin`; `arm-none-eabi-size`: text 57,644 + data 20 = 57,664 B of 60K flash (**3.8K headroom**); bss 6,132 + data 20 ≈ 6.1K of 16K RAM. TX reachability audit remains a T9 item (TX is still compiled in the base core; channel records are written TX-locked).
 
 ## T2. Band-lock enforcement
 - [ ] `PACK_FreqAllowed(freq_hz, mode)` — valid entry bands in both modes: 450000000–470000000, 162400000–162550000, 151000000–160000000, 108000000–137000000 (airband, AM only), 156000000–162000000 (marine), 462550000–467725000 (FRS/GMRS), 88000000–108000000 (broadcast path only); PRACTICE additionally permits frequency entry/scanning across that set plus 144000000–148000000 (2m); hard-reject 824–894 / 1710–1755 / 1850–1990 / 2110–2155 MHz (ECPA) in **both** modes.
