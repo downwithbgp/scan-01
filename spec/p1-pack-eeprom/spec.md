@@ -1,7 +1,7 @@
 # P1 Spec — Pack model & EEPROM layout (RaceScan edition)
 
 **Status:** v0.1 — spec for review
-**Applies to:** the RaceScan edition of the F4HWN v4.3 base (`F4HWN/src/uv-k5-firmware-custom-4.3/`)
+**Applies to:** the RaceScan edition of the F4HWN v4.3 base (the vendored base — repo root)
 **Sources verified:** `settings.h` (EEPROM_Config_t, VFO_Info_t), `settings.c` (SETTINGS_SaveChannel, region map), `driver/eeprom.c` (8 KB @ 0xA0), `misc.h` (ChannelAttributes_t, MR_CHANNEL_LAST=199), `app/aircopy.c` (0x1E00 boundary)
 **Related:** `docs/design/hci-vision.md` (§4.5 capture, §5 screens, §6 pack, §7 RX-only)
 

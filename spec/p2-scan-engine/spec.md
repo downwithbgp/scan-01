@@ -1,7 +1,7 @@
 # P2 Spec — Scan engine (RaceScan edition)
 
 **Status:** v0.2 — spec for review
-**Applies to:** the RaceScan edition of the F4HWN v4.3 base (`F4HWN/src/uv-k5-firmware-custom-4.3/`)
+**Applies to:** the RaceScan edition of the F4HWN v4.3 base (the vendored base — repo root)
 **Sources verified:** `app/chFrScanner.c` (channel-scan state machine; `scan_pause_delay_in_6_10ms = 100ms` in misc.c; fast-scan 90 ms; base comment "<= ~60 ms it misses signals (squelch response and/or PLL lock time)" at chFrScanner.c:361), `app/app.c` (`HandleIncoming` software tone gate via `g_CTCSS_Lost`/`g_CDCSS_Lost`, detection pause `scan_pause_delay_in_3_10ms` at app.c:170), `app/scanner.c` (CSS/frequency finder — kept for capture), `radio.c` (`RADIO_ConfigureSquelchAndOutputPower`, squelch tables at 0x1E00/0x1E60, `SquelchOpen*Thresh`), `settings.h` (`SCAN_RESUME_MODE`, `SCANLIST_PRIORITY_CH1/2`), `driver/bk4819.c` (noise/RSSI squelch, tone-lost flags, RSSI)
 **Related:** `docs/design/hci-vision.md` (§4 states, §5.3 SCAN screen, §8), `spec/p1-pack-eeprom/spec.md` (pack arrays, lockout bitmap, groups, venue bits)
 

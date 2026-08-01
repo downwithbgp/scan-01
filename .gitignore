@@ -1,3 +1,13 @@
-# F4HWN v4.3 reference source (zip + extraction) — kept locally, not committed (~90 MB).
-# Decide on vendoring strategy (submodule / vendor dir) when implementation starts.
-F4HWN/
+# build artifacts (from the F4HWN base)
+*.d
+*.o
+firmware
+/firmware.packed.bin
+/firmware.bin
+/compiled-firmware
+.cache
+compile_commands.json
+.vscode
+k5_eeprom.raw
+f4hwn
+f4hwn.*
