@@ -18,7 +18,7 @@ external acceptance criteria; everything else is build/review/test-able in this 
 - [ ] Writers: `PACK_SaveLockout`, `PACK_SaveFavorite`, `PACK_SetMyDriver`, `PACK_AddCapture` (writes channel record + name/team + CarMeta + counts + CRC; duplicate → `ALT` entry, never overwrite).
 - [ ] Channel-record writer using the base's packing (values per spec §4.1: Hz frequency, CTCSS index + `0x11` code type, TX_LOCK set).
 - [ ] Factory-reset extension: wipe 0x1BD0–0x1DFF in both reset modes (spec §4.4); `PACK_Load` sanity-checks channel frequencies.
-- [ ] Boot-state integration: valid pack → identity screen + SCAN; invalid/missing → "NO PACK" (capture still usable).
+- [ ] Boot-state integration: valid pack → identity screen + SCAN; invalid/missing → **demo-pack fallback** (flash-resident daily presets) → SCAN; "NO PACK" only as a SETUP diagnostic (capture still usable).
 - **Gate:** build; CRC/bitmap/conversion logic host-tested in `tests/` (harness introduced in T8); `/prop-test` on CRC + bitmap round-trips; code review against spec §4.3 byte table.
 
 ## T4. Racing-digits font (36 glyphs) + renderer
@@ -50,7 +50,8 @@ external acceptance criteria; everything else is build/review/test-able in this 
 - [ ] `validate` (§6 rules incl. ECPA band-lock), `build` → `pack.patch` region list, `diff`.
 - [ ] Introduce the host test harness: `tests/` with pytest for pure functions (Hz↔MHz, name/team composition/truncation, CTCSS/DCS value↔index against the dcs.c tables, bitmap packing, CRC16) — the firmware tasks T2/T3 mirror these.
 - [ ] `import` command (first parser: `indyspeedway` text format; fixture `race-packs/indyspeedway-ims-2026/source.txt` → semantically matches the checked-in draft `pack.json`).
-- [ ] `compose` + `library` commands (multi-event weekend assembly: merge event packs + `race-packs/library/series/` stations, dedupe by frequency, capacity trade-off report with trim options; fixtures: `woo-sprints.json` composes into a valid pack, and a two-venue fixture (IMS + IRP style) asserts venue bits + LIST divider order).
+- [ ] `compose` + `library` commands (multi-event weekend assembly: merge event packs + `race-packs/library/series/` + `daily/` stations, dedupe by frequency, capacity trade-off report with trim options; fixtures: `woo-sprints.json` and `daily-presets.json` compose into valid packs, and a two-venue fixture (IMS + IRP style) asserts venue bits + LIST divider order).
+- [ ] `modulation` mapping (FM/AM → channel-record byte 11) with validation (AM only on 108–137 MHz).
 - [ ] `dump` + `flash` over the base UART protocol (pin framing against `driver/uart.c` + CHIRP driver in this task; 8-byte chunked writes).
 - **Gate:** `pytest` green; `packtool validate` on a real sample pack (P0 data) exits ≤ 1 (no errors — the draft pack intentionally carries a duplicate-frequency warning); build→dump round-trip on a fixture EEPROM image is semantically identical (same cars/stations/lockouts/flags; byte-level equality not required — `ALT` entries are reconstructed best-effort, spec §5.2).
 

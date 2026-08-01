@@ -1,8 +1,10 @@
 # P2 tasks — Scan engine (RaceScan edition)
 
-Each task has a verification gate. Gates marked **(hw)** need real hardware;
-everything else is build/review/host-test-able in this repo. Depends on P1 T3
-(pack layer: `PackCar`/`PackStation` arrays, lockout bitmap) being in place.
+Each task has a verification gate. Gates marked **(hw)** need real hardware in a
+real RF environment; **(bench)** gates need only two radios on a bench — the
+daily development loop (spec §12); everything else is build/review/host-test-able
+in this repo. Depends on P1 T3 (pack layer: `PackCar`/`PackStation` arrays,
+lockout bitmap) being in place.
 
 ## S1. Scan universe module (`scan_pack.c` / `scan_pack.h` — new)
 - [ ] Build the index list from the pack arrays: venue order, cars + non-broadcast
@@ -23,28 +25,28 @@ everything else is build/review/host-test-able in this repo. Depends on P1 T3
       `CHFRSCANNER`.
 - [ ] Base resume-mode machinery bypassed (fixed carrier-drop + hang); resume-menu
       code compiled out of the edition.
-- **Gate:** build; timing logic reviewed against spec §4; **(hw)** UART debug output
-      of per-entry dwell timings on a real radio; verify ~80 ms/entry, the 200 ms
-      decode hold, and the 250 ms hang with a signal generator or second radio.
+- **Gate:** build; timing logic reviewed against spec §4; **(bench)** UART debug output
+      of per-entry dwell timings with a second radio or signal generator; verify
+      ~80 ms/entry, the 200 ms decode hold, and the 250 ms hang.
 
 ## S3. Landing & tone gate
 - [ ] Candidate = BK4819 squelch-open (base `FUNCTION_INCOMING` path); keep the
       software tone gate (`HandleIncoming` `g_CTCSS_Lost`/`g_CDCSS_Lost` checks)
       wired for tone'd entries; unmute after debounce.
 - [ ] Verify CSQ entries land and open on carrier-only (open-mic risk, spec §6.1).
-- **Gate:** build; **(hw)** two-radio test: tone'd transmitter opens audio only on
+- **Gate:** build; **(bench)** two-radio test: tone'd transmitter opens audio only on
       tone match; CSQ transmitter opens on carrier; no burst-edge click.
 
 ## S4. FOLLOW mode (v1)
 - [ ] My-driver (header `myDriver`) becomes the priority entry; interleave revisit
       every 8 entries (`FOLLOW_INTERLEAVE = 8`), tone-gated; no preemption of an
       already-landed exchange. Default ON when my-driver is set.
-- **Gate:** build; **(hw)** with a favorite transmitting intermittently, worst-case
+- **Gate:** build; **(bench)** with a favorite transmitting intermittently, worst-case
       latency ≈ 640 ms (measured via UART timestamps), no mid-exchange chopping.
 
 ## S5. CSQ hang guard (v1)
 - [ ] CSQ entry holding the scan > 5 s continuously → skipped for one full cycle.
-- **Gate:** host unit test (timer state machine, pure logic); **(hw)** open-mic test.
+- **Gate:** host unit test (timer state machine, pure logic); **(bench)** open-mic test.
 
 ## S6. Squelch tuning + adaptive (v0 / v1)
 - [ ] v0: race-tuned squelch defaults via `RADIO_ConfigureSquelchAndOutputPower`
@@ -57,7 +59,7 @@ everything else is build/review/host-test-able in this repo. Depends on P1 T3
 ## S7. Signal meter
 - [ ] RSSI → 4 bars on the SCAN screen (row 5), mapped per band via S0/S9
       (`ENABLE_RSSI_BAR` machinery).
-- **Gate:** build; **(hw)** screenshots via `screenshot.c` over UART at known RSSI
+- **Gate:** build; **(bench)** screenshots via `screenshot.c` over UART at known RSSI
       levels (signal generator or second radio at varying distance).
 
 ## S8. Integration

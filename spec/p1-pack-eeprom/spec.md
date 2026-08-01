@@ -54,7 +54,8 @@ Out of scope (later phases): scan-engine tuning (dwell/tone-lock/FOLLOW — P2),
 
 **Rules:**
 - `number`: 1–3 digits + optional one suffix letter (`"29A"`, `"13F"`) — **max 3 chars total** (the binary field is 3 bytes, §4.3). The string is the identity; `"29"` ≠ `"29A"`. No leading zeros.
-- `freqs`: 1–2 entries, MHz decimal, 450.000–470.000 MHz (teams/control) or 162.400–162.550 (NOAA — `kind: noaa` stations only). Broadcast stations use `fm` (88.0–108.0) and have no `freqs`. Station `freq` may additionally be **151.000–160.000 MHz** (VHF dirt-track PA/operations — WoO track guidance).
+- `freqs`: 1–2 entries, MHz decimal, 450.000–470.000 MHz (teams/control) or 162.400–162.550 (NOAA — `kind: noaa` stations only). Broadcast stations use `fm` (88.0–108.0) and have no `freqs`. Station `freq` may additionally be **151.000–160.000 MHz** (VHF dirt-track PA/operations — WoO track guidance), **108.000–137.000 MHz** (airband — requires `"modulation": "am"`), **156.000–162.000 MHz** (marine VHF), and **462.550–467.725 MHz** (FRS/GMRS) — the daily-use bands (§1.5 of the vision).
+- `modulation`: default `"fm"`; `"am"` for airband entries (base enum: `MODULATION_FM=0`, `MODULATION_AM=1` — byte 11, §4.1). AM is only valid on 108–137 MHz.
 - `tone`: `0` = none · CTCSS in Hz (`94.8`) · **DCS as a zero-padded 3-digit octal string (`"271"`, `"032"`)** — IndyCar mandates a unique DCS/DPL code per car (rulebook 7.4.1.3), so DCS is first-class. Values must exist in the base tables (`CTCSS_Options[50]`, `DCS_Options[104]` — both in dcs.c); packtool maps value → index.
 - `bandwidth`: `"narrow"` (default, 12.5 kHz — IndyCar rulebook 7.4.1.1) or `"wide"`.
 - `group`: `"A" | "B" | "C" | "ALL"` (scan groups). `favorite`: bool. `origin`: `"pack" | "captured" | "manual"`. `verified`: bool.
@@ -93,7 +94,7 @@ RaceScan writes RX-only-safe values:
 | +8 | 1 | RX code | **index into `CTCSS_Options[50]` (CT=1) or `DCS_Options[104]` (CT=2)** — both tables in dcs.c; 0 = none. packtool maps Hz/octal → index |
 | +9 | 1 | TX code | same as RX (harmless; TX compiled out) |
 | +10 | 1 | (TX code type << 4) \| RX code type | `0x11` CTCSS · `0x22` DCS (`CODE_TYPE_DIGITAL=2`) · `0x00` none — without the type the tone is inert (radio.c gates on it) |
-| +11 | 1 | (modulation << 4) \| offset direction | 0 (FM, offset off) |
+| +11 | 1 | (modulation << 4) \| offset direction | FM (0) for cars/stations by default; AM (1) for airband entries — from `modulation`; offset off |
 | +12 | 1 | TX_LOCK<<6 \| BUSY_LOCK<<5 \| POWER<<2 \| BW<<1 \| FREV | `0x46` = TX_LOCK(1) + power low(1) + **narrow bandwidth(1)** — 12.5 kHz narrowband is mandated by IndyCar rulebook 7.4.1.1; `bandwidth: "wide"` entries clear the BW bit |
 | +13 | 1 | DTMF PTT ID / decode | 0 |
 | +14 | 1 | STEP_SETTING | 0 |
@@ -192,7 +193,7 @@ Reverse of §5.1: read pack table (validate magic + CRC; if invalid, report "rad
 
 Hard errors:
 - number format (1–3 digits + optional letter), duplicates (after flattening; `ALT` entries exempt via `freqs[1]`), leading zeros.
-- frequency outside RX bands: cars 450.000–470.000; stations 450.000–470.000 / 162.400–162.550 / **151.000–160.000 (VHF dirt-track)**; broadcast 88.0–108.0.
+- frequency outside RX bands: cars 450.000–470.000; stations 450.000–470.000 / 162.400–162.550 / **151.000–160.000 (VHF dirt-track)** / **108.000–137.000 (airband, AM only)** / **156.000–162.000 (marine)** / **462.550–467.725 (FRS/GMRS)**; broadcast 88.0–108.0.
 - **cellular band-lock (ECPA): 824–894, 1710–1755, 1850–1990, 2110–2155 MHz → hard reject, always.**
 - counts > 64 cars / 24 stations; name > 10 chars or team > 6 after composition (unless auto-truncated with warning); tone not in `CTCSS_Options` / `DCS_Options`; station name > 4 chars.
 
@@ -222,7 +223,7 @@ packtool *never* writes outside the pack-owned regions (§4); `dump` reads every
 
 ## 8. Firmware pack layer (settings_pack.c — new)
 
-- `PACK_Load()` at boot: read header, validate magic + CRC, populate RAM arrays (`PackCar[64]`, `PackStation[24]`, lockout bitmap, my-driver). Failure → "NO PACK" boot state (capture still works).
+- `PACK_Load()` at boot: read header, validate magic + CRC, populate RAM arrays (`PackCar[64]`, `PackStation[24]`, lockout bitmap, my-driver). Failure → **demo-pack fallback** (a flash-resident daily pack: airband guard/unicom, marine 16/9, FRS 1/7/14 — from `race-packs/library/daily/daily-presets.json`, compiled in) so the radio always boots into something useful. "NO PACK" remains only as a SETUP diagnostic; capture still works either way.
 - `PACK_SaveLockout(i)`, `PACK_SaveFavorite(i)`, `PACK_SetMyDriver()`, `PACK_AddCapture(entry)` — each writes the minimal region + CRC.
 - Boot screen (vision §5.8) renders series/track/session + car count from the header.
 - Band-lock: a single filter function `PACK_FreqAllowed(freq)` used by every tune path (BK4819 set, CAPTURE, BRD, WX) — single point of enforcement.

@@ -1,0 +1,22 @@
+{
+  "name": "Daily presets",
+  "kind": "daily-stations",
+  "source": "FCC standard allocations — universal US frequencies",
+  "notes": "The demo/daily pack: what a new owner can scan the first evening, no race required. Weather (long-5) and broadcast FM (long-0) are handled by their own keys and are not listed here.",
+  "stations": [
+    { "name": "GUARD",  "kind": "other", "freq": 121.500, "modulation": "am",
+      "notes": "Airband VHF guard — universal." },
+    { "name": "UNICOM", "kind": "other", "freq": 122.800, "modulation": "am",
+      "notes": "Airband UNICOM — universal CTF frequency." },
+    { "name": "MAR16",  "kind": "other", "freq": 156.800,
+      "notes": "Marine VHF channel 16 — distress/calling, universal." },
+    { "name": "MAR09",  "kind": "other", "freq": 156.450,
+      "notes": "Marine VHF channel 9 — boater calling." },
+    { "name": "FRS1",   "kind": "other", "freq": 462.5625,
+      "notes": "FRS channel 1 — family radio." },
+    { "name": "FRS7",   "kind": "other", "freq": 462.7125,
+      "notes": "FRS channel 7." },
+    { "name": "FRS14",  "kind": "other", "freq": 467.7125,
+      "notes": "FRS channel 14." }
+  ]
+}

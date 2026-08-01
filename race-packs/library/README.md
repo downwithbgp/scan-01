@@ -13,6 +13,8 @@ library/
                 e.g. woo-sprints.json: Race Control, Raceceiver, PA, unconfirmed channels
   tracks/     — per-track frequencies (event packs reference these or carry them inline)
                 v0: populated from event packs; per-track entries appear as they get verified
+  daily/      — everyday presets (airband guard/unicom, marine, FRS) — the demo pack seed
+                e.g. daily-presets.json; weather + broadcast live on their own keys
 ```
 
 ## Conventions
@@ -46,3 +48,8 @@ packtool compose events.json   # events: [ {pack: "race-packs/indyspeedway-ims-2
 
 The desktop app (PC/Mac/Linux) is packtool with a GUI on top of exactly this flow:
 browse the library → pick the races you're attending this weekend → compose → flash.
+
+**The library is also the daily story** (vision §1.5): `daily/` holds universal presets
+(airband, marine, FRS) that compose into a default **daily pack** — the radio is useful
+the first evening, no race required. Capture feeds it daily, not just on race weekends:
+a caught aircraft frequency is a contribution like a caught race channel.

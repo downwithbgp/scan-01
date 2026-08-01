@@ -207,3 +207,24 @@ repurposed:
 5. **Adaptive squelch calibration** — auto at boot (fast, but calibrates against
    whatever is in the air) vs SETUP-triggered (accurate, but a step the fan must
    know)? v1 decision.
+
+## 12. Development & test strategy (the between-weekends loop)
+
+Race weekends cannot drive the development loop (vision §1.5). The engine is
+verifiable daily:
+
+- **Bench rig:** two K6s and (ideally) a signal generator. Tone-lock, dwell, hang,
+  debounce, FOLLOW, and the CSQ hang guard are all testable with one radio
+  transmitting test bursts — no track, no RF environment required. Most of the
+  S-task (hw) gates are actually **bench gates**.
+- **Host-testable engine:** the universe/filter logic (S1) and the timing/state
+  machines (S2/S5) are pure logic — unit + property tests in `tests/` (P1 T8
+  harness), run on every commit. `/prop-test` on filter composition and the
+  hang-guard state machine.
+- **Demo pack as test fixture:** the flash-resident fallback pack (P1 §8) doubles
+  as the daily test universe — deterministic channels, tone'd (FRS/marine are CSQ;
+  add a bench tone) and mixed, so bench tests run against a stable set.
+- **Track-validation remains only for what a bench cannot produce:** intermod and
+  desense in a packed grandstand, weak-car landing against real noise, the final
+  dwell value, and the fan-acceptance gate (vision §12 P1 gate).
+
