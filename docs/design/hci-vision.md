@@ -84,7 +84,7 @@ Rams: *"Good design makes a product understandable… it explains itself."* The 
 3. **Type a car number** (1–3 digits, optional suffix letter — "29A") to hear that car — anywhere outside SETUP.
 4. The radio **boots into SCAN** and scanning never stops unless you hold.
 5. **UP/DOWN walks the car list**; `*` (printed label: SCAN) always returns to scanning; long-`*` while holding a car locks it out; long-press the printed label on any key — 0 (FM) = broadcast, 5 (NOAA) = weather, 9 (CALL) = your driver, # (F) = favorites.
-6. **EXIT always returns to SCAN.** There is no "are you sure". There is no dead end.
+6. **EXIT always returns to SCAN** — and **long-EXIT is HOME**: the racing-programming browser (LIST), from anywhere, even from PRACTICE. There is no "are you sure". There is no dead end.
 7. **One press to follow, two to jump.** PTT follows what you hear; two digits jump to any car. The only longer path is CAPTURE — and it is a hold, a number, and a press, not a hunt.
 
 Everything in the firmware either serves these rules or is deleted.
@@ -117,17 +117,17 @@ Everything in the firmware either serves these rules or is deleted.
    └───────────────┘
 ```
 
-Solid arrows: one press. Long-press PTT (from SCAN, HOLD, or LIST) opens CAPTURE pre-filled with the last-heard frequency; ＋ NEW in LIST opens it empty. EXIT and `*` return to SCAN from any state. BRD (long-0) and WX (long-5) are HOLD-like sub-states reachable from any listening state; PTT, EXIT, or `*` returns to SCAN (§5.10).
+Solid arrows: one press. Long-press PTT (from SCAN, HOLD, or LIST) opens CAPTURE pre-filled with the last-heard frequency; ＋ NEW in LIST opens it empty. EXIT and `*` return to SCAN from any state; **long-EXIT is HOME — LIST in RACE mode, from anywhere (exits PRACTICE)**. BRD (long-0) and WX (long-5) are HOLD-like sub-states reachable from any listening state; PTT, EXIT, or `*` returns to SCAN (§5.10).
 
 - **SCAN** — the default state of the radio. Continuously scans the pack (all cars + stations), unmutes the moment a signal lands, holds briefly, resumes. The screen shows the currently-heard car. Scanning is *the* behavior; there is no "scan on/off", only "hold".
 - **HOLD** — one car, locked. Reached by PTT (hold what you hear), by typing a number, or by walking UP/DOWN through the car list. PTT again → back to SCAN.
 - **LIST** — the full pack as a scrollable list: car number + driver, stations (Race Control, MRN, PA, WX) at the end. Long-`*` toggles lockout. This is the only "browse" surface.
-- **SETUP** — four short pages: **Pack** (series/track/session loaded, lockouts, **Mode: RACE/PLAY**, **Seal**), **Audio** (mute duration, beeps off), **Display** (contrast, invert, backlight), **Info** (firmware, battery). Reached only via M. A fan can ignore it forever.
+- **SETUP** — four short pages: **Pack** (series/track/session loaded, lockouts, **Mode: RACE/PRACTICE**, **Seal**), **Audio** (mute duration, beeps off), **Display** (contrast, invert, backlight), **Info** (firmware, battery). Reached only via M. A fan can ignore it forever.
 
-**Modes: RACE and PLAY.** Modes wrap the state machine; they are not states. The experience begins the moment the weekend pack is loaded — not at the green flag — and the radio must survive the trip (vision §2: kids play at the airport and in the car; the weekend must arrive intact).
+**Modes: RACE and PRACTICE.** Modes wrap the state machine; they are not states. The experience begins the moment the weekend pack is loaded — not at the green flag — and the radio must survive the trip (vision §2: kids play at the airport and in the car; the weekend must arrive intact).
 
 - **RACE** — the pack is the world (the whole design above). **Boot default, always.** Pack mutations persist, as designed.
-- **PLAY** — the sandbox and the daily driver: the full legal band set (vision §1, "The radio lives between races"): aircraft 108–137 MHz AM — the airport is the best demo a radio has — marine VHF 156–162, FRS/GMRS 462.55–467.725, 2m ham 144–148, VHF 151–160, NOAA, broadcast FM; frequency entry and frequency scanning (the base's kept scanner); the pack browsable but **every change is ephemeral**: captures, lockouts, favorites, groups, my-driver are RAM-only and dropped on power-off or mode exit. The state line reads "◉ PLAY" instead of "◉ SCAN".
+- **PRACTICE** — the sandbox and the daily driver: the full legal band set (vision §1, "The radio lives between races"): aircraft 108–137 MHz AM — the airport is the best demo a radio has — marine VHF 156–162, FRS/GMRS 462.55–467.725, 2m ham 144–148, VHF 151–160, NOAA, broadcast FM; frequency entry and frequency scanning (the base's kept scanner); the pack browsable but **every change is ephemeral**: captures, lockouts, favorites, groups, my-driver are RAM-only and dropped on power-off or mode exit. The state line reads "◉ PRACTICE" instead of "◉ SCAN". **Long-EXIT is HOME: one gesture back to the racing programming — LIST in RACE mode.**
 - **The seal** (SETUP → Pack → Seal): while sealed, RACE refuses every pack mutation — capture save, lockout, favorite, group, my-driver — with a one-line "SEALED" status. This is the parent gesture: load the weekend, seal it, hand the radio to the kids. Power cycles, airport play, and car-ride mashing cannot change a sealed pack; unsealing is equally deliberate. (It is a parent gesture, not a security boundary — a determined child who can navigate SETUP can unseal. The guarantee is that *mashing buttons* cannot ruin the weekend.)
 - The seal only matters when a pack exists; an empty radio still captures (the empty-radio story, §4.5).
 
@@ -147,7 +147,7 @@ Solid arrows: one press. Long-press PTT (from SCAN, HOLD, or LIST) opens CAPTURE
 | **F1** short / long | MUTE 10 s / toggle MUTE | same | same | — |
 | **F2** short / long | cycle scan group / — | same | same | — |
 | **M** short / long | → SETUP / key lock | → SETUP / key lock | → SETUP / key lock | back / — |
-| **EXIT** | (no-op) | → SCAN | → SCAN | back |
+| **EXIT** (short / long) | (no-op) / → HOME (LIST, RACE mode) | → SCAN / → HOME | → SCAN / → HOME | back / → HOME |
 
 Notes:
 - **F-key chords are abolished.** F4HWN's `F + 5`, `F + 8` etc. are ham muscle memory; race fans get one function per physical key. The keypad key labeled `F #` loses its modifier role entirely — it is simply `#`, the favorites key. That is a feature.

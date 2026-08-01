@@ -9,7 +9,7 @@ external acceptance criteria; everything else is build/review/test-able in this 
 - **Gate:** `make racescan` builds; `arm-none-eabi-size` output recorded; packed bin fits 60K flash / 16K RAM with headroom ≥ 2K.
 
 ## T2. Band-lock enforcement
-- [ ] `PACK_FreqAllowed(freq_hz, mode)` — valid entry bands in both modes: 450000000–470000000, 162400000–162550000, 151000000–160000000, 108000000–137000000 (airband, AM only), 156000000–162000000 (marine), 462550000–467725000 (FRS/GMRS), 88000000–108000000 (broadcast path only); PLAY additionally permits frequency entry/scanning across that set plus 144000000–148000000 (2m); hard-reject 824–894 / 1710–1755 / 1850–1990 / 2110–2155 MHz (ECPA) in **both** modes.
+- [ ] `PACK_FreqAllowed(freq_hz, mode)` — valid entry bands in both modes: 450000000–470000000, 162400000–162550000, 151000000–160000000, 108000000–137000000 (airband, AM only), 156000000–162000000 (marine), 462550000–467725000 (FRS/GMRS), 88000000–108000000 (broadcast path only); PRACTICE additionally permits frequency entry/scanning across that set plus 144000000–148000000 (2m); hard-reject 824–894 / 1710–1755 / 1850–1990 / 2110–2155 MHz (ECPA) in **both** modes.
 - [ ] Wire into every tune path: BK4819 set, CAPTURE preview, BRD, WX. On reject: status flash + no tune.
 - **Gate:** pure function — host unit test (`tests/test_bandlock.c` or Python mirror) with boundary cases; `/prop-test` on the filter (random freqs, assert reject/allow classes + boundaries).
 
@@ -28,6 +28,7 @@ external acceptance criteria; everything else is build/review/test-able in this 
 - **Gate:** build + size report (~2.2 KB); **(hw)** render test screens dumped via `screenshot.c` over UART and reviewed against the §5.6 spec (glyph density, "29A" spacing).
 
 ## T5. Key handling
+- [ ] **Long-EXIT = HOME**: from any state, any mode → LIST in RACE mode (exits PRACTICE, discarding the practice session); while typing, long-EXIT still clears the entry first (base convention).
 - [ ] Long-press timers: PTT hold (~0.8 s → CAPTURE), label long-presses (0/5/9/M/*/F1/F2), suppressed while a digit entry is pending (spec: labels are a promise, not a trap).
 - [ ] Typing state machine: 1–3 digits + optional suffix letter (▲/▼ cycles A–Z), `*` = decimal point, EXIT delete / long-EXIT clear, timeout commit, no-car → "tune as frequency?" prompt.
 - [ ] Key map per vision §4.2 table (short = digit/nav; long = printed label).
@@ -36,7 +37,7 @@ external acceptance criteria; everything else is build/review/test-able in this 
 ## T6. Screens
 - [ ] SCAN / HOLD (vision §5.3 pixel budget — status strip, 32 px number zone, name 16 px, team 8 px, freq+signal, state line, whitespace row).
 - [ ] LIST (vision §5.4 — 16 px rows, gFontBig numbers, strike-through lockout, ＋ NEW row, **venue divider rows ("— IRP —") when the entry venue bit flips**).
-- [ ] CAPTURE (vision §5.9), BRD + WX (vision §5.10), SETUP (4 pages — incl. **Mode: RACE/PLAY** and **Seal** on the Pack page, vision §4.1), boot identity / NO PACK (vision §5.8).
+- [ ] CAPTURE (vision §5.9), BRD + WX (vision §5.10), SETUP (4 pages — incl. **Mode: RACE/PRACTICE** and **Seal** on the Pack page, vision §4.1), boot identity / NO PACK (vision §5.8).
 - [ ] LIST name editor (multi-tap keypad input, new component — the base input box is digits-only; vision §4.5).
 - **Gate:** build; **(hw)** screenshots via `screenshot.c` over UART for every screen + state variant; reviewed against the vision wireframes (pixel budgets exact).
 
@@ -44,7 +45,7 @@ external acceptance criteria; everything else is build/review/test-able in this 
 - [ ] Long-PTT → CAPTURE pre-filled with last-heard freq + decoded tone (`BK4819_GetCxCSSScanResult`); typed entry path (digits + `*`); live preview before save.
 - [ ] Save: number (digits + suffix), `ALT` on duplicate, `origin=captured, verified=false`, joins current group, name `NEW`/`ALT <name>`, EEPROM persist.
 - [ ] Expose captured entries to `pack_status()`/dump.
-- [ ] Seal + PLAY guards (spec §5.3/§8): pack layer stubs all mutations in PLAY (RAM-only, dropped on power-off), refuses them when sealed; boot always returns to RACE; `pack_status()` reports mode + seal bit.
+- [ ] Seal + PRACTICE guards (spec §5.3/§8): pack layer stubs all mutations in PRACTICE (RAM-only, dropped on power-off), refuses them when sealed; boot always returns to RACE; `pack_status()` reports mode + seal bit.
 - **Gate:** build; review against vision §4.5; **(hw)** end-to-end: capture → reboot → entry present + scanning.
 
 ## T8. packtool v0 (Python)

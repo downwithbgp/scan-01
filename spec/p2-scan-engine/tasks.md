@@ -66,7 +66,7 @@ lockout bitmap) being in place.
 - [ ] Boot → SCAN resume; PTT HOLD/resume; long-PTT CAPTURE pre-fill (last-heard);
       `*` resume; F2 group cycle; `#`/long-9 favorite re-anchor; long-`*` lockout;
       BRD/WX pause/resume; capture-save → universe rebuild; empty-universe state;
-      **PLAY mode: frequency-scan on play bands via the kept CSS scanner, RAM-only
+      **PRACTICE mode: frequency-scan on practice bands via the kept CSS scanner, RAM-only
       mutations, boot returns to RACE**.
 - [ ] Full-diff review (`/review`) of the engine against the base.
 - **Gate:** build + review; **(hw)** P1 acceptance: a fan uses the radio for a full

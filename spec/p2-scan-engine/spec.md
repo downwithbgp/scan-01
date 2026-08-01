@@ -160,11 +160,12 @@ repurposed:
 | PTT short | HOLD current entry / resume scan from next entry |
 | PTT long | Stop scan; CAPTURE pre-filled with last-heard (freq + tone from the landed entry) |
 | `*` short | Resume scan from any state |
+| long-EXIT | **HOME** — LIST in RACE mode from anywhere; exits PRACTICE (vision §4.1/§4.2) |
 | F2 short | Cycle group filter (universe rebuilt at next cycle boundary) |
 | `#` / long-9 | Favorites cycle / my-driver jump (vision §4.2) — engine re-anchors the scan at that car |
 | long-`*` (HOLD) | Lockout toggle → bitmap update → skipped from next cycle |
 | BRD / WX | Scan pauses while in the sub-state; resumes on PTT/EXIT/`*` |
-| **PLAY mode** | The scan runs against the play bands via the kept frequency scanner (vision §4.1); all pack mutations are RAM-only stubs; boot returns to RACE |
+| **PRACTICE mode** | The scan runs against the practice bands via the kept frequency scanner (vision §4.1); all pack mutations are RAM-only stubs; boot returns to RACE |
 | LIST | Browse state; scan resumes on EXIT/`*` (vision §4.1) |
 | CAPTURE | Scan stopped; save-as-car adds the entry → universe rebuilt, joins current group (vision §4.5) |
 
@@ -190,7 +191,7 @@ repurposed:
 | Lockout | `gMR_ChannelExclude` (RAM, base resets at boot) | pack lockout bitmap (persisted, P1 spec §4.3) |
 | Squelch | `RADIO_ConfigureSquelchAndOutputPower`, 0x1E00/0x1E60 tables | race-tuned defaults (v0); RAM-learned offsets (v1) |
 | RSSI meter | `ENABLE_RSSI_BAR`, S0/S9 | 4-bar display |
-| CSS finder | `app/scanner.c` (`SCANNER_*`) | **kept** — capture's tone-find on typed frequencies + PLAY-mode frequency scanning (vision §4.1) |
+| CSS finder | `app/scanner.c` (`SCANNER_*`) | **kept** — capture's tone-find on typed frequencies + PRACTICE-mode frequency scanning (vision §4.1) |
 
 ## 11. Open questions (track-validation items)
 
