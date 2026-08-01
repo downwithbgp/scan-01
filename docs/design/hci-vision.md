@@ -83,21 +83,29 @@ Everything in the firmware either serves these rules or is deleted.
 ### 4.1 States
 
 ```
-        ┌──────────────────────────────────────────────┐
-        │                                              │
-   ┌────▼────┐   PTT / digits / UP▼DOWN    ┌───────────▼──────┐
-   │  SCAN   │ ──────────────────────────► │     HOLD         │
-   │ (boot)  │ ◄────────────────────────── │ (one car, loud)  │
-   └────▲────┘        EXIT / PTT           └───────────▲──────┘
-        │                                              │
-        │  * (any)            EXIT                     │ digits / #
-        │                                              │
-   ┌────┴─────────┐                            ┌───────┴───────┐
-   │    LIST      │ ◄────────────────────────► │    SETUP      │
-   │ (car browser)│         M (rarely)         │ (4 pages,     │
-   └──────────────┘                            │  rarely seen) │
-                                               └───────────────┘
+        ┌────────────────────────────────────────────────────────┐
+        │                                                        │
+   ┌────▼────┐   PTT / digits / UP▼DOWN           ┌──────────────▼──────┐
+   │  SCAN   │ ─────────────────────────────────► │        HOLD         │
+   │ (boot)  │ ◄───────────────────────────────── │ (one car, loud)     │
+   └────▲────┘        EXIT / PTT                  └──────────────▲──────┘
+        │                       ▲                  │              │
+        │                       │ long-PTT         │ long-PTT     │ digits / #
+        │                       │                  ▼              │
+        │                       │          ┌──────────────┐       │
+        │                       │          │   CAPTURE    │───────┘
+        │                       │          │ (enter+save) │   PTT = save
+        │                       │          └──────────────┘   → HOLD on new car
+        │                       │                ▲  EXIT = cancel
+        │                       │                │
+        │  * (any)          EXIT │     ＋ NEW (LIST)      M (rarely)
+   ┌────┴─────────┐              │        ┌──────────┴───────────┐
+   │    LIST      │ ◄────────────┴───────► │        SETUP         │
+   │ (car browser)│                        │ (4 pages, rarely)   │
+   └──────────────┘                        └─────────────────────┘
 ```
+
+CAPTURE is a transient state (§4.5): enter a frequency — caught from the air (long-PTT) or typed — and save it as a car. Nothing is written until PTT confirms; EXIT cancels.
 
 - **SCAN** — the default state of the radio. Continuously scans the pack (all cars + stations), unmutes the moment a signal lands, holds briefly, resumes. The screen shows the currently-heard car. Scanning is *the* behavior; there is no "scan on/off", only "hold".
 - **HOLD** — one car, locked. Reached by PTT (hold what you hear), by typing a number, or by walking UP/DOWN through the car list. PTT again → back to SCAN.
@@ -109,10 +117,10 @@ Everything in the firmware either serves these rules or is deleted.
 | Input | SCAN | HOLD | LIST | SETUP |
 |---|---|---|---|---|
 | **Knob** | volume | volume | volume | volume / scroll |
-| **PTT** | → HOLD (lock current car) | → SCAN (resume) | → SCAN | back |
-| **0–9** | type car number → HOLD | type car number → HOLD | jump to number | — |
+| **PTT** (short / long) | → HOLD / → CAPTURE last-heard (§4.5) | → SCAN / → CAPTURE last-heard | → SCAN / → CAPTURE | back / — |
+| **0–9** | type car number → HOLD (or frequency: `*` = point, 6+ plain digits, §4.5) | type car number → HOLD (or frequency) | jump to number | — |
 | **UP / DOWN** | walk pack (hold preview) | walk pack | scroll list | change value |
-| `*` | → LIST (or cancel a half-typed number) | lockout toggle (this car) | lockout toggle (selected) | — |
+| `*` | → LIST (after digits: decimal point → frequency, §4.5) | lockout toggle (this car) | lockout toggle (selected) | — |
 | `#` | next favorite | next favorite | next favorite | — |
 | **F1** short / long | MUTE (10 s) / WX toggle | same | same | — |
 | **F2** short / long | broadcast radio (MRN/PRN) / cycle scan group | same | same | — |
@@ -121,22 +129,45 @@ Everything in the firmware either serves these rules or is deleted.
 
 Notes:
 - **F-key chords are abolished.** F4HWN's `F + 5`, `F + 8` etc. are ham muscle memory; race fans get one function per physical key. The keypad key labeled `F #` loses its modifier role entirely — it is simply `#`, the favorites key. That is a feature.
-- **Typing is a transient sub-state** of SCAN/HOLD/LIST: while digits are half-typed, `*` deletes the last digit and EXIT cancels; a short timeout commits.
+- **Typing is a transient sub-state** of SCAN/HOLD/LIST: while typing, EXIT deletes the last digit (long-EXIT clears all), a short timeout commits. `*` alone opens LIST; `*` after digits inserts the decimal point and turns the entry into a frequency (§4.5).
 - **PTT is not TX.** The edition is receive-only (see §7). The physical PTT button becomes the HOLD button — the biggest, most thumb-accessible control does the most important thing. This is the single most important interaction decision in this document.
 - **Lockout is instant and visible:** while holding a noisy car, one `*` press drops it from the scan; the LIST shows it struck through; one more `*` restores it. RE scanners hide lockout in a menu; ours is one press, because at a race the noisy channel *is* the problem in the moment.
 - **MUTE** silences audio for 10 s (or until PTT) — the "driver said a bad word, kids are right here" button. Long-press F1 toggles mute indefinitely.
 
 ### 4.3 Typing a car number
 
-Digits anywhere = "take me to that car". Two digits, done. Three digits for series with 3-digit numbers (IndyCar's 100+ era, NASCAR Trucks). A short timeout commits; a `*` or EXIT cancels. The typed digits render huge on screen as you type, so you can type *without looking* and verify with peripheral vision — this is a glanceable device.
+Digits anywhere = "take me to that car". Two digits, done. Three digits for series with 3-digit numbers (IndyCar's 100+ era, NASCAR Trucks). A short timeout commits; EXIT deletes the last digit (long-EXIT clears all). The digit rules are unambiguous: **1–3 digits = a car number; `*` after digits = the decimal point and the entry becomes a frequency; 6+ plain digits = a frequency too** (451125 → 451.125). An entry that matches no car — any length — offers to tune as a frequency instead of guessing (placement by band: 450–470 UHF, 162 NOAA, 88–108 broadcast; the exact rule is a P0 validation item). The typed digits render huge on screen as you type, so you can type *without looking* and verify with peripheral vision — this is a glanceable device.
 
 ### 4.4 What deliberately does NOT exist
 
-- No VFO/MR split. No frequency mode. (The pack is the only world.)
+- No VFO/MR split, no ham "frequency mode" (bands, steps, offsets, dual watch). The pack is the only world — *but the world grows*: direct frequency entry exists solely as the **CAPTURE** path (§4.5), where a typed or caught frequency immediately becomes a pack entry. There is no parked frequency that lives outside the pack.
 - No CTCSS/DCS/Step/Offset/ScanRng/Squelch-level settings. Per-car squelch defaults are baked in by the pack tool; the fan never sees them.
 - No 63-item menu. No menu index.
 - No scanning "modes" (TO/CO), no scan-list juggling — the scan group concept is reduced to F2-long cycling ALL → FAVS → A/B/C.
 - No TX. No VOX, no alarm, no DTMF, no scrambler, no 1750 Hz. None of it exists in this build (the base codebase keeps it for the ham editions).
+
+### 4.5 On-the-go capture: entering and saving frequencies at the track
+
+Packs are wrong sometimes, teams switch frequencies mid-race, and a friend with a better scanner will say "try 451.1125". The radio must be able to learn — without a laptop, without a menu, without ham-radio concepts.
+
+**Path A — catch it from the air (the primary path).** Long-press PTT in SCAN or HOLD: CAPTURE opens pre-filled with the last-heard frequency and its decoded tone (the BK4819 already decodes CTCSS — `BK4819_GetCxCSSScanResult`). Zero typing to save something you just heard. *(Implementation note: the base treats PTT as press/release-only, so a hold-timer on PTT must be added — the same mechanism the base already uses for F1/F2/M long-presses.)* With no pack loaded there is no last-heard to pre-fill; that path is typed entry (below).
+
+**Path B — type it.** Digits with `*` as the decimal point (`451` `*` `1125`), or 6+ plain digits, open CAPTURE as a live preview — you hear the frequency immediately, before saving anything.
+
+**The save flow (shared):** type the car number in the 32 px racing digits (required), then PTT saves. The new entry:
+
+- joins the current scan group — the fan hears it again without doing anything else;
+- is born `origin: captured, verified: false` (§6.1) — honest data, upgraded only when confirmed;
+- gets the name "NEW" by default; renaming happens in LIST (M on the row → name editor — a small new multi-tap keypad component; the base's input box is digits-only, so this is new P1 code);
+- **duplicate numbers never overwrite:** if the number already exists in the pack, the radio offers "24 EXISTS — PTT = add 24 ALT · EXIT = cancel", appending an alternate entry (§6.1's flat model). Pack data is never silently destroyed.
+
+The CAPTURE form has **no auto-commit timeout** — the car-jump timeout of §4.3 is disabled here; the form stays until PTT saves or EXIT cancels.
+
+EXIT cancels. Nothing is written until PTT confirms — an accidental long-press is harmless.
+
+**The empty-radio story:** capture works even with no pack loaded — typed entry (Path B) and the LIST "＋ NEW" slot work on an empty radio, so a fan who shows up with a blank radio can build a mini-pack from scratch, one frequency at a time. The radio is never useless.
+
+**Capture feeds the open data:** packtool's dump reads captured entries back and turns them into pack submissions — own observation at the track is the most legitimate source a community database can have (§6.2).
 
 Rams: *"less but better — because it concentrates on the essential aspects."*
 
@@ -153,7 +184,7 @@ Everything renders on the 8 px hardware line (`gFrameBuffer[7][128]`: one status
 | `gFontSmall` | 6×8 | 94 | ~560 B | base (`font.c`) | status strip, metadata, LIST names |
 | `gFontSmallBold` | 6×8 | 94 | ~560 B | base, opt-in | emphasis, lockout hints |
 | `gFontBig` | 7×16 | 94 | ~1.3 KB | base | LIST row numbers, boot screen |
-| `gFontBigDigits` | 10×16 | 11 (0–9, −) | ~220 B | base | unused — superseded by the racing digits |
+| `gFontBigDigits` | 10×16 | 11 (0–9, −) | ~220 B | base | CAPTURE frequency line (§5.9) |
 | `gFontSmallDigits` | 7×8 | 11 | ~80 B | base | status-bar digits |
 | `gFont3x5` | 3×5 | 96 | ~290 B | base | unused (spectrum-analyzer-only) |
 | **`gFontRacingDigits` (new)** | **18×32** | **10 (0–9)** | **~720 B** | **new** | **the car number** |
@@ -204,7 +235,7 @@ row 7   ▴ 64 cars · * = lockout        hint (8px)
 ```
 
 - Rows are 16 px: the number in `gFontBig` (7×16) leads, the full name in 8 px sits beside it (vertically centered). The number still leads — it is the identity.
-- Three rows visible plus a scroll hint. Stations (RACE CTRL, MRN, PA, WX) are entries at the bottom, typed in caps so they read as "not a car".
+- Three rows visible plus a scroll hint. Stations (RACE CTRL, MRN, PA, WX) are entries at the bottom, typed in caps so they read as "not a car". A final "＋ NEW" row opens CAPTURE empty (§4.5).
 - Lockout = a strike-through line across the row. One `*` press toggles it. Visible, reversible, no sub-menu.
 
 ### 5.5 The SETUP screens
@@ -237,6 +268,23 @@ Power on → 0.8 s brand/pack screen (pack name: "DAYTONA 500 — FEB 2026" + ca
 
 Backlight: on at boot, auto-dim after 30 s (configurable), full-bright on any key. Sun readability is handled by contrast + the bold 32 px digits, not by fighting the sun with backlight.
 
+### 5.9 The CAPTURE screen
+
+```
+row 0   ▮▮▮▮ 14:32 ▂▄▆█
+row 1┐  451.1125 · T 94.8          freq in gFontBigDigits (16px) · tone 8px
+row 2┘
+row 3┐  24                         car-number input, 32 px racing digits
+row 4┘
+row 5   SAVE AS CAR #24            preview of what will be saved
+row 6   PTT = save · EXIT = cancel
+row 7                               whitespace
+```
+
+- The frequency line reuses the base's 10×16 `gFontBigDigits` via `UI_DisplayFrequency`, which also draws the decimal point inline (the glyph table holds 0–9 + − only) — no new font for frequency typing; the 32 px racing digits handle the number input, so the new font does both jobs.
+- One screen, two moments: it opens pre-filled (caught from the air) or empty (typed), and it is *live* — you hear what you are about to save before you commit.
+- The tone shows here only: it is part of what gets saved, so it reads as confirmation, not configuration (§6.1: tones are data, not settings).
+
 ---
 
 ## 6. The weekend pack (data model + open data)
@@ -251,7 +299,7 @@ Pack {
            season: 2026, date: "2026-02-15", author, version },
   cars:  [ { number: "24", driver: "William Byron", team: "Hendrick Motorsports",
              entry: "HMS · CHEVY", freqs: [450.8875, 451.1125],
-             tone: 94.8, group: "A", favorite: true },
+             tone: 94.8, group: "A", favorite: true, origin: "pack", verified: true },
            ... 64 total ],
   stations: [ { name: "RACE CTRL",  freq: 461.200, tone: 0 },
               { name: "MRN",        fm: 101.1 },            // broadcast radio
@@ -263,7 +311,8 @@ Pack {
 
 - Cars map to memory-channel slots; the *car number* is the channel identity — the frequency is just an attribute. (This inverts the stock mental model where a channel is a frequency.)
 - Cars with multiple freqs (primary/secondary) appear as **separate flat entries** — `24 BYRON` and `24 ALT · BYRON` — exactly how RE-style packs list alternates. No multi-freq UI complexity anywhere; the pack decides. (A v1 refinement may collapse them into one entry with an alt shown in HOLD.)
-- Tones (CTCSS) are *data*, not settings. The fan never sees them.
+- Tones (CTCSS) are *data*, not settings. Outside the CAPTURE screen (§5.9) the fan never sees them — there, the captured tone is shown as confirmation of what gets saved, not as a configuration value.
+- Every entry carries `origin` (`pack` \| `captured` \| `manual`) and `verified` (`true`/`false`). Pack entries ship verified by their author; on-radio captures are born `captured`/`false` and are upgraded only when someone confirms them at the track. This is the raw material of the data pipeline (§6.2).
 
 ### 6.2 Open data is the moat-buster
 
@@ -271,6 +320,7 @@ RE sells frequency guides every season. We open-source the equivalent:
 
 - **`race-packs/`** — a community-curated, git-tracked database: per series × track × session, with verification workflow (a contributor marks a pack "verified at the track", date-stamped). Frequency changes per season are normal; git history *is* the changelog.
 - **Sourcing rule:** pack data is collected from public sources, own observation at the track, and fan submissions — never scraped from paid frequency guides (RE's guides are commercial publications; wholesale copying invites copyright/database-rights claims we don't need). Contributors attribute their sources in the pack metadata.
+- **Capture is the best source.** A fan who catches a frequency on the radio and exports it has done own-observation field work — the most legitimate data there is. The pipeline moves entries `captured` → `reported` → `verified`; the packtool dump (over the PC cable) is a data-submission tool as much as a backup.
 - **`packtool`** — a small CLI (later a web page) that compiles a pack JSON → EEPROM image, flashes over the USB/serial cable, and can *record* a live session ("while scanning, mark this car") to build a pack from scratch at the track.
 
 This is the part that makes the whole thing sustainable: hardware is commodity, firmware is free, and the *data* — the thing RE monetizes hardest — is open and community-owned.
@@ -355,8 +405,8 @@ The base is a fork of the F4HWN lineage (Apache-2.0) and already has the right s
 
 ## 12. Roadmap
 
-- **P0 — Validate (now, weeks):** collect real frequency data from 2–3 race weekends (Daytona, Sebring, Indy are the natural first three); interview 3–5 real fans; confirm the pack model against what a weekend actually needs. *Gate: a verified sample pack for one track.*
-- **P1 — RaceScan firmware on stock K6 (weeks–months):** pack model + EEPROM layout; SCAN/HOLD/LIST/SETUP screens; key map; RX-only edition build; packtool v0; boot/backlight/power behavior. *Gate: a fan (not a ham) uses it for a full race without asking a question.*
+- **P0 — Validate (now, weeks):** collect real frequency data from 2–3 race weekends (Daytona, Sebring, Indy are the natural first three); interview 3–5 real fans; confirm the pack model against what a weekend actually needs; validate the digit-entry rules (§4.3/§4.5: car vs frequency, decimal point) with real fans. *Gate: a verified sample pack for one track.*
+- **P1 — RaceScan firmware on stock K6 (weeks–months):** pack model + EEPROM layout; SCAN/HOLD/LIST/SETUP screens; key map; **on-the-go capture (long-PTT catch, typed entry, save-as-car, duplicate→ALT rule, unverified flag, packtool export, multi-tap name editor)**; RX-only edition build; packtool v0; boot/backlight/power behavior. *Gate: a fan (not a ham) uses it for a full race without asking a question.*
 - **P2 — Scan engine + data (months):** tone-lock landing, FOLLOW mode, adaptive squelch; web pack builder; open `race-packs/` v1 (Daytona, Sebring, Indy, Watkins Glen, Charlotte, Road America…). *Gate: community submits a verified pack for a track we don't cover.*
 - **P3 — Hardware v2 (only if P1/P2 show demand):** open-hardware prototype per §10. *Gate: 100+ users of P1/P2.*
 
