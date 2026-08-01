@@ -13,6 +13,11 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
+    - name: Run host tests (band-lock)
+      run: |
+        gcc -Wall -Werror -Wextra -I. tests/test_bandlock.c pack_bandlock.c -o /tmp/test_bandlock
+        /tmp/test_bandlock
+
     - name: Build the scan01 edition
       run: |
         docker build --build-arg ALPINE_TAG=3.22 -t uvk5 .

@@ -211,6 +211,11 @@ OBJS += ui/welcome.o
 OBJS += version.o
 OBJS += main.o
 
+# ---- Scan 01 edition additions ----
+ifeq ($(EDITION_STRING),Scan01)
+OBJS += pack_bandlock.o
+endif
+
 ifeq ($(OS), Windows_NT) # windows
     TOP := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
     RM = del /Q

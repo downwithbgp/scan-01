@@ -8,10 +8,10 @@ external acceptance criteria; everything else is build/review/test-able in this 
 - [x] `ENABLE_FEAT_SCAN01` guard — Makefile block **after** the `CFLAGS =` reset (earlier `+=` is wiped); verified in the compile flags.
 - **Gate (PASS):** docker build (alpine:3.22 + gcc-arm-none-eabi) → `f4hwn.scan01.packed.bin`; `arm-none-eabi-size`: text 57,644 + data 20 = 57,664 B of 60K flash (**3.8K headroom**); bss 6,132 + data 20 ≈ 6.1K of 16K RAM. TX reachability audit remains a T9 item (TX is still compiled in the base core; channel records are written TX-locked).
 
-## T2. Band-lock enforcement
-- [ ] `PACK_FreqAllowed(freq_hz, mode)` — valid entry bands in both modes: 450000000–470000000, 162400000–162550000, 151000000–160000000, 108000000–137000000 (airband, AM only), 156000000–162000000 (marine), 462550000–467725000 (FRS/GMRS), 88000000–108000000 (broadcast path only); PRACTICE additionally permits frequency entry/scanning across that set plus 144000000–148000000 (2m); hard-reject 824–894 / 1710–1755 / 1850–1990 / 2110–2155 MHz (ECPA) in **both** modes.
-- [ ] Wire into every tune path: BK4819 set, CAPTURE preview, BRD, WX. On reject: status flash + no tune.
-- **Gate:** pure function — host unit test (`tests/test_bandlock.c` or Python mirror) with boundary cases; `/prop-test` on the filter (random freqs, assert reject/allow classes + boundaries).
+## T2. Band-lock enforcement — function DONE, wiring pending
+- [x] `PACK_FreqAllowed(freq_hz, mode)` in `pack_bandlock.c/h` — entry bands (88–108, 108–137, 151–162 [dirt+marine union], 162.4–162.55, 450–470 [incl. FRS]) valid in both modes; 2m 144–148 PRACTICE-only; cellular 824–894 / 1710–1755 / 1850–1990 / 2110–2155 hard-rejected in both modes, always (ECPA). In the edition build (Makefile OBJS, Scan01-gated).
+- [ ] Wire into every tune path: BK4819 set, CAPTURE preview, BRD, WX. On reject: status flash + no tune. — **sequenced with the features that call them (T6 screens, T7 capture, S-tasks scan engine); no base tune path is guarded yet because the base's own scanning must keep working until the scan engine replaces it.**
+- **Gate (PASS):** host test `tests/test_bandlock.c` — gcc -Wall -Werror: **814,958 checks, 0 failures** (17 real-world cases incl. the 2m RACE/PRACTICE split; every band edge ±1 Hz, both modes; 400k random freqs × 2 modes vs an independent classifier [soundness + completeness] + mode monotonicity). Firmware build green; function currently gc-sections-stripped (no caller yet) — 0 B delta until wiring pulls it in.
 
 ## T3. Pack layer (`settings_pack.c` / `settings_pack.h` — new)
 - [ ] Header read/validate (magic "SC01", version, CRC16-CCITT) at boot; RAM arrays for cars/stations/lockouts/my-driver.
