@@ -144,56 +144,94 @@ Rams: *"less but better — because it concentrates on the essential aspects."*
 
 ## 5. Screen language (128×64, stock hardware)
 
-### 5.1 Typography
+### 5.1 The type inventory (verified against the base)
 
-Three sizes, two of which already exist in the codebase (`font.c`):
+Everything renders on the 8 px hardware line (`gFrameBuffer[7][128]`: one status line + seven 8 px frame lines, `driver/st7565.h`). Fonts are stored as strips of 8-row columns and blitted with one `memcpy` per frame line — the `gFontBig` pattern in `ui/helper.c`. **Nothing in the renderer needs to change for a new font; only a new data table.**
 
-- **8 px** — status strip, metadata, list names (existing small fonts, incl. the 6×8 bold variant)
-- **16 px** — driver names, list rows (existing `gFontBig`, 14×16)
-- **32 px** — car numbers: a new dedicated *racing digits* font (0–9, plus a minimal A–Z for station tags). Big, bold, high-contrast. New bitmap font, small (10 glyphs core).
+| Font | Size | Glyphs | Flash | Origin | Role in RaceScan |
+|---|---|---|---|---|---|
+| `gFontSmall` | 6×8 | 94 | ~560 B | base (`font.c`) | status strip, metadata, LIST names |
+| `gFontSmallBold` | 6×8 | 94 | ~560 B | base, opt-in | emphasis, lockout hints |
+| `gFontBig` | 7×16 | 94 | ~1.3 KB | base | LIST row numbers, boot screen |
+| `gFontBigDigits` | 10×16 | 11 (0–9, −) | ~220 B | base | unused — superseded by the racing digits |
+| `gFontSmallDigits` | 7×8 | 11 | ~80 B | base | status-bar digits |
+| `gFont3x5` | 3×5 | 96 | ~290 B | base | unused (spectrum-analyzer-only) |
+| **`gFontRacingDigits` (new)** | **18×32** | **10 (0–9)** | **~720 B** | **new** | **the car number** |
 
-Rule: **one big thing per screen.** The eye lands on the car number. Everything else is 8 px quiet.
+The one new font costs ~0.7 KB of flash — and the edition is deleting TX, VOX, DTMF, alarm, and scrambler anyway. Typography is not a memory problem; it is a design problem.
 
-### 5.2 The SCAN screen (also HOLD)
+### 5.2 The scale: 8 / 16 / 32
 
-```
-▮▮▮▮ 14:32 ▂▄▆█              ← status strip: battery, clock, signal (8px)
-┌──────┐
-│  24  │ BYRON               ← car number 32px (left), driver 16px (right)
-│      │ WILLIAM
-│      │ HMS · CHEVY         ← team/entry 8px
-└──────┘
- 450.8875  T 94.8            ← freq + CTCSS, small (8px)
- ● SCAN  24 of 64            ← state + position in pack (8px)
-```
+One size per job, ratio 1:2:4, every size a multiple of the 8 px line:
 
-- SCAN vs HOLD differ only in the bottom line: `● SCAN 24 of 64` vs `◼ HOLD 24`. One pixel row of difference — the state change is a *change of one line*, so it reads instantly without re-reading the screen.
-- In SCAN, the number block updates live as the scanner lands on cars. In HOLD it is static.
-- The signal glyph (`▂▄▆█`) is the only "meter". No S-units, no dBm. Race fans read bars.
-- Inverted video for the currently-audible car in SCAN (blink-free, stable — no blinking anything, ever).
+- **8 px** — the quiet voice: status strip, frequency, hints, LIST names. Present, never shouting.
+- **16 px** — the explanatory voice: the driver's last name on SCAN, row numbers in LIST.
+- **32 px** — the loud voice: the car number. One size only. There is no "medium".
 
-### 5.3 The LIST screen
+Why this works on this display: it is 1-bit — no anti-aliasing, no gray. Legibility comes from *weight and size*, not rendering tricks. In direct sun, at arm's length, with the backlight fighting glare, the 32 px digits are the only thing the fan must read; everything else is bonus. Hierarchy by size ratio, not by decoration.
+
+### 5.3 The SCAN screen (also HOLD) — the pixel budget
 
 ```
-▮▮▮▮ 14:32 ▂▄▆█
- 08 JOHNSON              ← 16px number, 8px name, 2-line rows
-    JIMMIE
-▐24 BYRON              ▌ ← selected row, inverted
-▐   WILLIAM            ▌
- 19 TRUEX JR
-    MARTIN
- ▴ ▾ 64 entries · * = lockout   (8px hint line)
+row 0   ▮▮▮▮ 14:32 ▂▄▆█                 status strip (8px): battery · clock · signal · lock
+row 1 ┐
+row 2 │        24    BYRON             number zone 32px (right-aligned) · last name 16px
+row 3 │              HMS · CHEVY       team/entry 8px
+row 4 ┘
+row 5   450.8875 ─────────── ▂▂▄▆      freq (8px) · signal bar (right)
+row 6   ◉ SCAN                         state (8px): ◉ SCAN / ◼ HOLD 24 / ▸ LIST
+row 7                                  whitespace — the frame
 ```
 
-- Three full rows visible; scroll indicator. Stations (RACE CTRL, MRN, PA, WX) are entries at the bottom of the list, typed in caps so they read as "not a car".
-- Locked-out cars render struck-through (`̶2̶4̶` style or dimmed) — visible, reversible.
-- `*` toggles the selected row. EXIT returns to SCAN.
+- **The number is right-aligned in its zone** — the door-number convention: "5", "24", "100" all anchor to the same edge, so a changing number never jitters.
+- **No box around the number.** The whitespace is the frame. The number is the only 32 px object on the screen; it does not need a border to be found.
+- **Last name at 16 px, team at 8 px.** "BYRON" is the identity; the first name lives in LIST. No tone display — tones are pack data, not fan information (§6.1).
+- **SCAN vs HOLD = one changed line.** `◉ SCAN` vs `◼ HOLD 24`; the rest of the screen is identical. No "24 of 64" position ticker — during a scan it would change constantly, and constant change is noise.
+- **No inverted video on this screen.** The audible car is identified by the number itself; invert is reserved for LIST selection.
+- Row 7 stays empty. A screen that is never full reads as calm.
 
-### 5.4 The SETUP screens
+### 5.4 The LIST screen
 
-Four pages, 8 px rows, UP/DOWN + knob to edit, M to move between pages. This is the only place the firmware resembles a menu, and it is deliberately boring. Fans should be able to own the radio for a year without opening it.
+```
+row 0   ▮▮▮▮ 14:32 ▂▄▆█
+row 1┐  24  BYRON · WILLIAM            ← selected row: inverted 16px block
+row 2┘
+row 3┐  08  JOHNSON · JIMMIE
+row 4┘
+row 5┐  19  TRUEX JR · MARTIN          ← struck through when locked out
+row 6┘
+row 7   ▴ 64 cars · * = lockout        hint (8px)
+```
 
-### 5.5 Boot sequence
+- Rows are 16 px: the number in `gFontBig` (7×16) leads, the full name in 8 px sits beside it (vertically centered). The number still leads — it is the identity.
+- Three rows visible plus a scroll hint. Stations (RACE CTRL, MRN, PA, WX) are entries at the bottom, typed in caps so they read as "not a car".
+- Lockout = a strike-through line across the row. One `*` press toggles it. Visible, reversible, no sub-menu.
+
+### 5.5 The SETUP screens
+
+Four pages, 8 px rows (seven visible), UP/DOWN + knob to edit, M to move between pages. This is the only place the firmware resembles a menu, and it is deliberately boring — no big type, no icons, just text. Fans should be able to own the radio for a year without opening it.
+
+### 5.6 The racing digits font (new)
+
+The only new font in the whole edition. Spec:
+
+- **10 glyphs (0–9), nothing else.** Station tags are 8 px caps; the car number is the only thing that ever needs to be huge.
+- **Metrics:** 32 px tall (4 strips of 8), cap height ~24 px, standard advance 18 px, "1" narrowed to 12 px. A 3-digit number ("100") = 18+18+12 + spacing ≈ 52 px — leaves room for the name block.
+- **Style:** heavy, slightly condensed grotesque — the feel of a race-car door number. Uniform stroke weight (1-bit: no thin parts), open counters so "0", "8", "9" never fill in on a coarse LCD.
+- **Storage & rendering:** 4 strips × width bytes per glyph, blitted with four `memcpy`s into consecutive frame lines — exactly the `gFontBig` pattern, no renderer changes.
+- **Cost:** ~10 × 4 × 18 ≈ 720 B flash. Generated through the existing `utils/` font pipeline (`.fon` → C tables).
+- **Always right-aligned** (§5.3), so 1-, 2-, and 3-digit numbers sit on the same edge.
+
+### 5.7 Screen-space principles (Rams on a 128×64)
+
+1. **One big thing per screen.** SCAN: the number. LIST: the selected row. SETUP: nothing — it is utility and should look it.
+2. **Whitespace is a frame, not waste.** The empty row and the empty zone around the number do the work a border would do.
+3. **No blinking. Ever.** State is a static glyph, not an animation. Blinking is how cheap radios scream; this one does not scream.
+4. **The status strip is quiet and constant:** battery, clock, signal, lock — four items, 8 px, never more. No mode icons (Vox, DWR, PTT-mode…): those are ham concepts. An optional "clean mode" (SETUP → Display) removes even this strip.
+5. **Invert is a selection tool only** — the LIST row. Not decoration, not alerts.
+6. **Everything sits on the 8 px grid; every font is a multiple of 8 px tall.** No half-line layouts, no pixel soup.
+
+### 5.8 Boot sequence
 
 Power on → 0.8 s brand/pack screen (pack name: "DAYTONA 500 — FEB 2026" + car count) → straight into SCAN. No "press any key", no menu, no confirmation. The pack screen doubles as the *identity* of the loaded data, so a fan who forgot to load a pack sees "NO PACK — plug in and load" instead of a blank radio.
 
