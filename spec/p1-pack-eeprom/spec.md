@@ -32,7 +32,7 @@ Out of scope (later phases): scan-engine tuning (dwell/tone-lock/FOLLOW — P2),
 {
   "meta": { "series": "NASCAR Cup", "track": "Daytona", "session": "Race",
             "season": 2026, "date": "2026-02-15", "author": "n4racin",
-            "version": 1 },
+            "version": 1, "venues": ["Daytona", "New Smyrna"] },
   "cars": [
     { "number": "24", "driver": "William Byron", "team": "Hendrick Motorsports",
       "entry": "HMS · CHEVY", "freqs": [450.8875, 451.1125],
@@ -58,6 +58,7 @@ Out of scope (later phases): scan-engine tuning (dwell/tone-lock/FOLLOW — P2),
 - `tone`: `0` = none · CTCSS in Hz (`94.8`) · **DCS as a zero-padded 3-digit octal string (`"271"`, `"032"`)** — IndyCar mandates a unique DCS/DPL code per car (rulebook 7.4.1.3), so DCS is first-class. Values must exist in the base tables (`CTCSS_Options[50]`, `DCS_Options[104]` — both in dcs.c); packtool maps value → index.
 - `bandwidth`: `"narrow"` (default, 12.5 kHz — IndyCar rulebook 7.4.1.1) or `"wide"`.
 - `group`: `"A" | "B" | "C" | "ALL"` (scan groups). `favorite`: bool. `origin`: `"pack" | "captured" | "manual"`. `verified`: bool.
+- `venue`: entry index into `meta.venues` (default 0). `meta.venues` names the events in a multi-venue weekend (Brickyard + IRP); `track` is `venues[0]`. **v0 supports exactly two venues** — 3+ fold into venue 1 with a compose warning.
 - Stations: `kind` is `"broadcast" | "control" | "pa" | "officials" | "safety" | "radio" | "media" | "other"`; `"radio"` covers network feeds on UHF (MRN/PRN — e.g. MRN is 454.2 MHz at IMS, not commercial FM). `"digital": true` flags a feed RaceScan v0 cannot decode (it is listed but skipped by the scan).
 - `lockouts`: array of car numbers currently locked out of the scan.
 - Cap: **≤ 64 cars** (alternate frequencies count as entries, see §5.1) and **≤ 24 stations** (the IMS weekend alone needs 17: PA×3, media×3, radio×4, control×2, safety×2, officials×3).
@@ -74,7 +75,7 @@ Total 8 KB (0x0000–0x1FFF). The pack owns four regions; everything else is eit
 | Settings block | 0x0E28–0x0F4F | ~296 | base gEeprom fields (subset used) |
 | FM broadcast channels | 0x0E40 | — | untouched (BRD presets come from StationMeta) |
 | **Channel names + team** | **0x0F50** | 200×16 | §4.2 — name (10 B, base-compatible) + team (6 B, RaceScan-only) |
-| **Pack table** | **0x1BD0** | ≤ 548 | §4.3 — header + CarMeta + StationMeta |
+| **Pack table** | **0x1BD0** | ≤ 556 | §4.3 — header + CarMeta + StationMeta |
 | DTMF contacts | 0x1C00 | 512 | compiled out in RaceScan; part of pack-table space |
 | Aircopy | 0x1E00 | — | compiled out; keep clear |
 | Calibration / options | 0x1EC0–0x1FFF | 320 | **never written by packtool or the pack layer** |
@@ -113,16 +114,17 @@ off  size  field
 0x00  4     magic "RSPK" (0x52 0x53 0x50 0x4B)
 0x04  1     format version = 0x01
 0x05  8     series, ASCII space-padded ("NASCARCUP", "IMSA    ", "INDYCAR ")
-0x0D  12    track, ASCII space-padded ("DAYTONA    ")
+0x0D  12    track — primary venue name, ASCII space-padded ("DAYTONA    ")
 0x19  8     session, ASCII space-padded ("RACE    ", "QUALI   ", "PRACT   ")
 0x21  1     car count (1–64)
 0x22  1     station count (0–24)
 0x23  8     lockout bitmap (bit i = car slot i locked out)
 0x2B  4     my-driver number, ASCII NUL-padded ("24\0\0", "29A\0")
-0x2F  2     CRC16-CCITT over bytes 0x00..0x2E
-0x31  —     pad to 0x34
-0x34  n×4   CarMeta[car], n = car count (≤ 64)
-0x34+4n  m×10  StationMeta[station], m = station count (≤ 24)
+0x2F  8     venue2 — secondary venue name, ASCII space-padded (≤ 8 chars)
+0x37  2     CRC16-CCITT over bytes 0x00..0x36
+0x39  —     pad to 0x3C
+0x3C  n×4   CarMeta[car], n = car count (≤ 64)
+0x3C+4n  m×10  StationMeta[station], m = station count (≤ 24)
 ```
 
 **CarMeta (4 B):** `number[3]` ASCII NUL-padded ("24\0", "29A", "100") + `flags[1]`:
@@ -133,9 +135,10 @@ off  size  field
 | 2 | favorite | 0/1 |
 | 3–4 | origin | 0=pack, 1=captured, 2=manual |
 | 5 | verified | 0/1 |
-| 6–7 | reserved | 0 |
+| 6 | venue | 0=primary (header track), 1=secondary (header venue2) |
+| 7 | reserved | 0 |
 
-**StationMeta (10 B):** `name[4]` ASCII NUL-padded ("MRN\0", "CTRL", "PA\0\0") + `freq[4]` **u32 LE Hz** (broadcast: 101.1 MHz → 101100000; non-broadcast: 461200000) + `tone[1]` (bit 7 = DCS flag; bits 0–6 = table index; 0x00 = none) + `kind[1]` (bits 0–2 = kind, bit 3 = digital — digital stations are listed but **skipped by the scan**):
+**StationMeta (10 B):** `name[4]` ASCII NUL-padded ("MRN\0", "CTRL", "PA\0\0") + `freq[4]` **u32 LE Hz** (broadcast: 101.1 MHz → 101100000; non-broadcast: 461200000) + `tone[1]` (bit 7 = DCS flag; bits 0–6 = table index; 0x00 = none) + `kind[1]` (bits 0–2 = kind, bit 3 = digital — digital stations are listed but **skipped by the scan**, bit 4 = venue 0/1):
 
 | kind | meaning | RX path | needs channel record |
 |---|---|---|---|
@@ -148,11 +151,11 @@ off  size  field
 | 6 | media (NBC crew etc.) | BK4819 | yes |
 | 7 | other | BK4819 | yes |
 
-Sizes: header 0x34 (52) + 64×4 (256) + 24×10 (240) = **548 B ≤ 560 B** available. 12 B spare.
+Sizes: header 0x3C (60) + 64×4 (256) + 24×10 (240) = **556 B ≤ 560 B** available. 4 B spare.
 
-The budget is **`52 + 4·n + 10·m ≤ 560`** (n cars, m stations): 64 cars → 25 stations max, 36 cars → 36 stations, 26 cars → 40, 0 cars → 50. Multi-event weekends (Brickyard + IRP, Daytona 24 + short track) exceed the caps by design — packtool `compose` reports the trade-off and lets the user trim; v1 can rebalance the caps without a format change.
+The budget is **`60 + 4·n + 10·m ≤ 560`** (n cars, m stations): 64 cars → 24 stations, 36 cars → 35 stations, 26 cars → 39, 0 cars → 50. Multi-event weekends (Brickyard + IRP, Daytona 24 + short track) exceed the caps by design — packtool `compose` reports the trade-off and lets the user trim; v1 can rebalance the caps without a format change.
 
-**Wear note:** lockout toggles rewrite header bytes 0x23–0x30 (14 bytes, spanning three 8-byte chunks). EEPROM endurance (~1M writes) makes this a non-issue at race-day rates; noted for the record.
+**Wear note:** lockout toggles rewrite header bytes 0x23–0x38 (22 bytes, spanning four 8-byte chunks — byte 0x38 falls in its own page). EEPROM endurance (~1M writes) makes this a non-issue at race-day rates; noted for the record.
 
 ### 4.4 Factory reset (edition change required)
 
@@ -168,14 +171,14 @@ The base's `SETTINGS_FactoryReset` behavior around the pack table is wrong for u
 
 1. Validate (§6). On error: abort with a report; on warning: proceed and print.
 2. **Flatten cars:** each car with `freqs[1]` produces a second entry `number` (same) + `name = "ALT <last>"` + same tone/group/flags. Array order is preserved; `n = cars + alts ≤ 64`.
-3. **Assign channels:** cars/alts → ch 0..n−1; non-broadcast stations → ch n..n+m−1 (broadcast stations get no channel record). `n ≤ 64`, `m ≤ 24`, `n + m ≤ 88 ≤ 200`.
+3. **Assign channels:** cars/alts → ch 0..n−1; non-broadcast stations → ch n..n+m−1 (broadcast stations get no channel record). `n ≤ 64`, `m ≤ 24`, `n + m ≤ 88 ≤ 200`. **Entries are ordered by venue — all venue-0 entries, then all venue-1 — so LIST dividers render once each.**
 4. Write channel records (§4.1 — incl. per-entry bandwidth), names + team (§4.2), pack table (§4.3) with CRC over the header.
 5. Channels beyond `n+m` in 0..79 are zeroed (so a stale pack never half-survives); 80..199 left as-is.
 6. Writes are region-scoped (see §7) — calibration and the settings block are never written by `build`.
 
 ### 5.2 Dump (EEPROM → pack)
 
-Reverse of §5.1: read pack table (validate magic + CRC; if invalid, report "radio has no valid pack"), read names/team, reconstruct cars (alts become `freqs[1]` — matched by number + `ALT ` name prefix, best-effort), read lockout bitmap + my-driver, emit JSON. `origin`/`verified` round-trip through CarMeta flags. Captured entries come out `origin: "captured", verified: false` — ready for the community pipeline.
+Reverse of §5.1: read pack table (validate magic + CRC; if invalid, report "radio has no valid pack"), read names/team, reconstruct cars (alts become `freqs[1]` — matched by number + `ALT ` name prefix, best-effort), read lockout bitmap + my-driver, emit JSON. Venues are reconstructed from the header's `track` (venue 0) and `venue2` (venue 1); the entry venue bit maps back to `meta.venues` indices. `origin`/`verified` round-trip through CarMeta flags. Captured entries come out `origin: "captured", verified: false` — ready for the community pipeline.
 
 ### 5.3 Capture lifecycle (on-radio)
 
@@ -193,7 +196,7 @@ Hard errors:
 - **cellular band-lock (ECPA): 824–894, 1710–1755, 1850–1990, 2110–2155 MHz → hard reject, always.**
 - counts > 64 cars / 24 stations; name > 10 chars or team > 6 after composition (unless auto-truncated with warning); tone not in `CTCSS_Options` / `DCS_Options`; station name > 4 chars.
 
-Warnings: duplicate frequency across entries (IndyCar rulebook 7.4.1.2 requires unique per-car freqs — flag, don't fail), number collides with a station name, digital station (not monitorable by RaceScan v0 — the scan skips it), missing driver/team fields, unverified pack (`verified: false` on the pack meta is fine — only entries carry the flag).
+Warnings: duplicate frequency across entries (IndyCar rulebook 7.4.1.2 requires unique per-car freqs — flag, don't fail), number collides with a station name, digital station (not monitorable by RaceScan v0 — the scan skips it), missing driver/team fields, venue index ≥ 2 (folded into venue 1 by compose), venue-2 name > 8 chars (truncated in the binary), unverified pack (`verified: false` on the pack meta is fine — only entries carry the flag).
 
 ## 7. packtool v0 contract
 
@@ -203,7 +206,7 @@ Python CLI (stdlib + `pyserial`), no firmware knowledge needed by users:
 |---|---|
 | `packtool validate pack.json` | §6 checks; exit code 0/1/2 (ok/warnings/errors) |
 | `packtool import <file> <format>` | parse a published frequency list into pack.json (first parser: `indyspeedway` text format; fixture: `race-packs/indyspeedway-ims-2026/source.txt`, expected output: the checked-in draft `pack.json`) |
-| `packtool compose events.json` | assemble a weekend pack: load event packs + library series stations (`race-packs/library/series/`), merge + dedupe by frequency, report the capacity trade-off (§4.3) when caps are exceeded with trim options |
+| `packtool compose events.json` | assemble a weekend pack: load event packs + library series stations (`race-packs/library/series/`), merge + dedupe by frequency, **assign venues per event (≤ 2; `events.json` maps each event to `venues[0]`/`venues[1]`)**, report the capacity trade-off (§4.3) when caps are exceeded with trim options |
 | `packtool library list [series\|track]` | list library stations matching a series/track (drives the desktop app's picker) |
 | `packtool build pack.json` | emits `pack.patch` — ordered list of `(addr, bytes)` region writes (§5.1) + human-readable summary |
 | `packtool flash <port> pack.json` | `build` then apply over UART, region-scoped |

@@ -244,6 +244,7 @@ row 7   ▴ 64 cars · hold * = lockout   hint (8px)
 
 - Rows are 16 px: the number in `gFontBig` (7×16) leads, the full name in 8 px sits beside it (vertically centered). The number still leads — it is the identity.
 - Three rows visible plus a scroll hint. Stations (RACE CTRL, MRN, PA, WX) are entries at the bottom, typed in caps so they read as "not a car". A final "＋ NEW" row opens CAPTURE empty (§4.5).
+- Multi-venue weekends (Brickyard + IRP, Daytona 24 + the local short track) render a divider row — "— IRP —" — when the entry's venue flips; `compose` orders entries by venue so each divider appears exactly once (spec §4.3/§7).
 - Lockout = a strike-through line across the row. One long-`*` press toggles it. Visible, reversible, no sub-menu.
 
 ### 5.5 The SETUP screens
