@@ -1,52 +1,130 @@
-# uv-k6-firmware — open race-scanner firmware
+Scan 01
+--------
 
-Modern, purpose-built firmware for the Quansheng UV-K5/K6 (and family), reimagined for
-**race fans** — NASCAR, IMSA, IndyCar, dirt track. The market is cornered by Racing
-Electronics and their rental/purchase prices; this project is the open-source answer:
-the $25 commodity radio is already a race scanner, the firmware and the frequency data
-are free. An **event scanner for every day**: racing is the wedge, daily use drives
-development (vision §1).
+Scan 01 is a receive-only scanner firmware for the Quansheng UV-K5/K6
+(and family) handheld radios, built for race fans. It turns a $25 radio
+into a race scanner: car numbers instead of frequencies, a weekend
+"pack" of channels loaded from a PC, and an interface that starts
+scanning the moment it powers on. It is a specialized edition of the
+F4HWN v4.3 firmware (a fork of egzumer's UV-K5 firmware), vendored at
+the root of this repository.
 
-**Tone:** we compete on the work, not the insults. Competitors are named only in
-factual comparisons (prices, product behavior); market claims are sourced and
-attributed. No competitor bashing in commits, docs, or code — ever.
+The firmware is in active development. There are no releases yet; see
+[Project status](#project-status) for what works today.
 
-- **Design vision:** [docs/design/hci-vision.md](docs/design/hci-vision.md) — the HCI
-  reimagination (car-number-first interaction, PTT→HOLD, RACE/PRACTICE modes, the seal,
-  HOME via long-EXIT, weekend "packs" of open frequency data). Start here.
-- **Specs:** [spec/p1-pack-eeprom/](spec/p1-pack-eeprom/) (pack format + EEPROM layout,
-  task list T1–T10) · [spec/p2-scan-engine/](spec/p2-scan-engine/) (scan engine, S1–S9).
-- **Data:** [race-packs/](race-packs/) — event packs (IndyCar/IMS 2026 draft) and the
-  frequency library (WoO series stations, daily presets).
-- **Rams audit:** [docs/design/rams-audit.md](docs/design/rams-audit.md).
+### Why Scan 01
 
-## Status
+Racing Electronics owns the race-scanner market. A weekend rental runs
+$50–80, a purchase $300–600, and the frequency guides are sold
+separately, every season, per track. The radio this firmware runs on
+already contains everything a race scanner needs: FM reception across
+the racing bands, a numeric keypad, a 128×64 display, a knob. The
+firmware is free and the frequency data is open.
 
-Design + specs complete; **implementation started (T1: edition scaffold done)**.
-The firmware source is the vendored F4HWN v4.3 base (Apache-2.0, upstream:
-armel/uv-k5-firmware-custom), trimmed (CMSIS reduced to the build's two include dirs;
-old `archive/` binaries dropped) and living at the repo root.
+The full design is in [docs/design/hci-vision.md](docs/design/hci-vision.md).
 
-## Building the Scan 01 edition
+### What makes it different
 
-Docker is the supported toolchain path (no native arm-none-eabi needed):
+* The car number is the identity. Channels are cars ("24", "29A"), not
+  frequencies; typing a number jumps to that car.
+* RACE and PRACTICE modes. RACE is the pack world: boot, scan, hold.
+  PRACTICE is an ephemeral sandbox for the airport, the car ride, and
+  the kids — every change evaporates on power-off, and a sealed pack
+  cannot be modified by button-mashing.
+* No menus in the hot path. Seven rules total (vision doc §3). Long-press
+  EXIT is HOME: back to the car browser from anywhere.
+* Receive-only, always. TX is locked at the channel-record level, and US
+  cellular bands are hard-rejected in firmware (ECPA §2511).
+* Packs instead of programming. A weekend's listening world is a JSON
+  pack, composed by a PC tool and flashed over USB: cars, stations (race
+  control, PA, MRN, weather), lockouts, favorites.
+* Open data. [`race-packs/`](race-packs/) holds event packs and a
+  frequency library — the thing the incumbents sell is the thing we open.
 
-```
-docker build --build-arg ALPINE_TAG=3.22 -t uvk5 .
-./compile-with-docker.sh scan01    # → compiled-firmware/f4hwn.scan01.packed.bin
-```
+### Hardware
 
-or directly: `docker run -v "$PWD:/app" uvk5 /bin/bash /app/build-scan01.sh`.
+Quansheng UV-K5 / UV-K6 and family: BK4819 receiver, 128×64 LCD, 16-key
+keypad, two side keys, rotary encoder. The firmware has a 60 KB flash
+budget and 16 KB of RAM.
 
-**T1 gate (passes):** text 57,644 B + data 20 of 60K flash (~3.8K headroom);
-RAM ~6.1K of 16K. The edition defines `ENABLE_FEAT_SCAN01` (Makefile, after the
-`CFLAGS =` reset — earlier `+=` gets wiped) for edition-specific code.
+### Project status
 
-Flag policy: only flags the base's own editions prove safe are disabled
-(SPECTRUM/VOX/AIRCOPY/AUDIO_BAR); several "creative" disables (`ENABLE_BIG_FREQ=0`,
-`ENABLE_SCAN_RANGES=0`) expose latent unconditional-reference bugs in the base and are
-deferred until the screens (T6) actually replace that code.
+| Task | State |
+| ---- | ----- |
+| T1 — edition scaffold | Done — `scan01.packed.bin` builds, 3.8 KB flash headroom |
+| T2 — band-lock (`PACK_FreqAllowed`) | Done — 815,004 host checks, 0 failures |
+| T3–T10 — pack layer, screens, capture, packtool | Pending |
 
-## License
+The task list is [spec/p1-pack-eeprom/tasks.md](spec/p1-pack-eeprom/tasks.md);
+the scan-engine spec is [spec/p2-scan-engine/](spec/p2-scan-engine/).
 
-Derived work follows the base's Apache-2.0 license (see LICENSE).
+### Building
+
+Docker is the supported toolchain path (no ARM toolchain needed on the
+host):
+
+    $ docker build --build-arg ALPINE_TAG=3.22 -t uvk5 .
+    $ ./compile-with-docker.sh scan01
+
+or directly:
+
+    $ docker run -v "$PWD:/app" uvk5 /bin/bash /app/build-scan01.sh
+
+Output: `scan01.packed.bin` (plus `scan01`, `scan01.bin`). The build is
+gated: text must stay within 58 KB (60 KB minus 2 KB headroom). CI
+enforces this on every push.
+
+### Running the tests
+
+Host tests (band-lock):
+
+    $ gcc -Wall -Werror -Wextra -I. tests/test_bandlock.c pack_bandlock.c -o /tmp/test_bandlock
+    $ /tmp/test_bandlock
+
+CI runs these on every push, then builds the firmware and checks the
+flash gate.
+
+### Why shouldn't I use Scan 01 yet?
+
+* There are no releases and no stable binary. Flashing today means
+  building from source.
+* The scan engine, the pack layer, and packtool are not implemented.
+  The radio currently runs the base F4HWN UI, not the Scan 01 interface.
+* The receiver is a $25 wide-open front end. In a packed grandstand it
+  will hear everything, including things you don't want. FM works; a
+  tuned front end waits for the hardware v2 (vision doc §10).
+* 2m ham (144–148 MHz) tuning is PRACTICE-mode only.
+
+### Data
+
+[`race-packs/`](race-packs/) contains event packs and the frequency
+library. The IndyCar/IMS 2026 draft pack (26 cars, 17 stations) is
+transcribed from the public indyspeedway.com page and is not yet
+field-verified; see
+`race-packs/indyspeedway-ims-2026/README.md` for provenance. Data
+follows the sourcing rule (vision §6.2): public sources and own
+observation only, never scraped from paid guides.
+
+### Contributing
+
+PRs are welcome. Two rules:
+
+* **Tone:** competitors are named only in factual comparisons; market
+  claims are sourced. No competitor bashing in commits, docs, or code.
+* **Deletion test** (rams-audit): a feature must serve the seven rules,
+  need no new key or setting the fan sees, not be doable in the app, and
+  be usable during a caution flag. If it fails any, it goes to the app or
+  the backlog.
+
+### License
+
+Apache-2.0, inherited from the vendored base (DualTachyon → OneOfEleven →
+egzumer → F4HWN). See [LICENSE](LICENSE) and [NOTICE](NOTICE).
+
+### Documentation
+
+* [Design vision](docs/design/hci-vision.md) — the HCI reimagination
+* [P1 spec — pack format and EEPROM layout](spec/p1-pack-eeprom/spec.md)
+* [P2 spec — scan engine](spec/p2-scan-engine/spec.md)
+* [Rams audit](docs/design/rams-audit.md) — self-assessment against the
+  ten principles
