@@ -54,7 +54,7 @@ Out of scope (later phases): scan-engine tuning (dwell/tone-lock/FOLLOW — P2),
 
 **Rules:**
 - `number`: 1–3 digits + optional one suffix letter (`"29A"`, `"13F"`) — **max 3 chars total** (the binary field is 3 bytes, §4.3). The string is the identity; `"29"` ≠ `"29A"`. No leading zeros.
-- `freqs`: 1–2 entries, MHz decimal, 450.000–470.000 MHz (teams/control) or 162.400–162.550 (NOAA — `kind: noaa` stations only). Broadcast stations use `fm` (88.0–108.0) and have no `freqs`. Station `freq` may additionally be **151.000–160.000 MHz** (VHF dirt-track PA/operations — WoO track guidance), **108.000–137.000 MHz** (airband — requires `"modulation": "am"`), **156.000–162.000 MHz** (marine VHF), and **462.550–467.725 MHz** (FRS/GMRS) — the daily-use bands (§1.5 of the vision).
+- `freqs`: 1–2 entries, MHz decimal, 450.000–470.000 MHz (teams/control) or 162.400–162.550 (NOAA — `kind: noaa` stations only). Broadcast stations use `fm` (88.0–108.0) and have no `freqs`. Station `freq` may additionally be **151.000–160.000 MHz** (VHF dirt-track PA/operations — WoO track guidance), **108.000–137.000 MHz** (airband — requires `"modulation": "am"`), **156.000–162.000 MHz** (marine VHF), and **462.550–467.725 MHz** (FRS/GMRS) — the daily-use bands (vision §1, "The radio lives between races").
 - `modulation`: default `"fm"`; `"am"` for airband entries (base enum: `MODULATION_FM=0`, `MODULATION_AM=1` — byte 11, §4.1). AM is only valid on 108–137 MHz.
 - `tone`: `0` = none · CTCSS in Hz (`94.8`) · **DCS as a zero-padded 3-digit octal string (`"271"`, `"032"`)** — IndyCar mandates a unique DCS/DPL code per car (rulebook 7.4.1.3), so DCS is first-class. Values must exist in the base tables (`CTCSS_Options[50]`, `DCS_Options[104]` — both in dcs.c); packtool maps value → index.
 - `bandwidth`: `"narrow"` (default, 12.5 kHz — IndyCar rulebook 7.4.1.1) or `"wide"`.
@@ -122,8 +122,9 @@ off  size  field
 0x23  8     lockout bitmap (bit i = car slot i locked out)
 0x2B  4     my-driver number, ASCII NUL-padded ("24\0\0", "29A\0")
 0x2F  8     venue2 — secondary venue name, ASCII space-padded (≤ 8 chars)
-0x37  2     CRC16-CCITT over bytes 0x00..0x36
-0x39  —     pad to 0x3C
+0x37  2     CRC16-CCITT over bytes 0x00..0x39
+0x39  1     pack flags (bit 0 = sealed — RACE refuses all pack mutations; bits 1–7 reserved, 0)
+0x3A  —     pad to 0x3C
 0x3C  n×4   CarMeta[car], n = car count (≤ 64)
 0x3C+4n  m×10  StationMeta[station], m = station count (≤ 24)
 ```
@@ -185,6 +186,7 @@ Reverse of §5.1: read pack table (validate magic + CRC; if invalid, report "rad
 
 - New capture (vision §4.5): write a fresh channel record + name (`ALT <last>` or `NEW` + number) + CarMeta with `origin=1 (captured), verified=0`, update counts + CRC.
 - Duplicate number → append as `ALT` entry (never overwrite, vision §4.5).
+- **Sealed pack**: while the header flags byte has bit 0 set (SETUP → Pack → Seal), every pack mutation — capture save, lockout, favorite, group, my-driver — is refused with a one-line "SEALED" status (vision §4.1). Seal applies only when a pack exists; an empty radio still captures. Unseal is the same deliberate toggle.
 - **Pack full (64 cars)**: CAPTURE save is rejected with a "PACK FULL — dump & trim" status (screen + no write). Capture still works; only persistence is refused.
 - Lockout toggle → flip bitmap bit, rewrite header + CRC (persists across reboots — the base keeps lockout in RAM only; this is our fix).
 - Favorite toggle / my-driver change → CarMeta flag / header field, rewrite CRC.
@@ -224,9 +226,10 @@ packtool *never* writes outside the pack-owned regions (§4); `dump` reads every
 ## 8. Firmware pack layer (settings_pack.c — new)
 
 - `PACK_Load()` at boot: read header, validate magic + CRC, populate RAM arrays (`PackCar[64]`, `PackStation[24]`, lockout bitmap, my-driver). Failure → **demo-pack fallback** (a flash-resident daily pack: airband guard/unicom, marine 16/9, FRS 1/7/14 — from `race-packs/library/daily/daily-presets.json`, compiled in) so the radio always boots into something useful. "NO PACK" remains only as a SETUP diagnostic; capture still works either way.
-- `PACK_SaveLockout(i)`, `PACK_SaveFavorite(i)`, `PACK_SetMyDriver()`, `PACK_AddCapture(entry)` — each writes the minimal region + CRC.
+- `PACK_SaveLockout(i)`, `PACK_SaveFavorite(i)`, `PACK_SetMyDriver()`, `PACK_AddCapture(entry)` — each writes the minimal region + CRC. **The pack layer is the single mutation choke point: in PLAY mode (`gPlayMode`, RAM) all mutations are RAM-only stubs (dropped on power-off); in RACE with the seal flag set they are refused.** Boot always returns to RACE.
+- `PACK_Load()` also restores `gPlayMode = false` and the seal bit from the header flags byte; `PACK_IsSealed()` feeds the UI status line.
 - Boot screen (vision §5.8) renders series/track/session + car count from the header.
-- Band-lock: a single filter function `PACK_FreqAllowed(freq)` used by every tune path (BK4819 set, CAPTURE, BRD, WX) — single point of enforcement.
+- Band-lock: a single filter function `PACK_FreqAllowed(freq, mode)` used by every tune path (BK4819 set, CAPTURE, BRD, WX) — single point of enforcement. **The valid set is the entry bands (§3/§6), in both modes:** 450–470 / 162.4–162.55 / 151–160 / **108–137 AM (airband)** / **156–162 (marine VHF)** / **462.55–467.725 (FRS/GMRS)** / 88–108 broadcast — a daily pack legitimately contains airband/marine/FRS entries. **PLAY additionally permits frequency entry/scanning across that set plus 2m 144–148** (receive-only, legal). **Cellular (824–894, 1710–1755, 1850–1990, 2110–2155) is hard-rejected in both modes, always (ECPA §2511).**
 
 ## 9. Open questions (P0 validation items)
 

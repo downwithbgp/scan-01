@@ -122,7 +122,14 @@ Solid arrows: one press. Long-press PTT (from SCAN, HOLD, or LIST) opens CAPTURE
 - **SCAN** — the default state of the radio. Continuously scans the pack (all cars + stations), unmutes the moment a signal lands, holds briefly, resumes. The screen shows the currently-heard car. Scanning is *the* behavior; there is no "scan on/off", only "hold".
 - **HOLD** — one car, locked. Reached by PTT (hold what you hear), by typing a number, or by walking UP/DOWN through the car list. PTT again → back to SCAN.
 - **LIST** — the full pack as a scrollable list: car number + driver, stations (Race Control, MRN, PA, WX) at the end. Long-`*` toggles lockout. This is the only "browse" surface.
-- **SETUP** — four short pages: **Pack** (series/track/session loaded, lockouts), **Audio** (mute duration, beeps off), **Display** (contrast, invert, backlight), **Info** (firmware, battery). Reached only via M. A fan can ignore it forever.
+- **SETUP** — four short pages: **Pack** (series/track/session loaded, lockouts, **Mode: RACE/PLAY**, **Seal**), **Audio** (mute duration, beeps off), **Display** (contrast, invert, backlight), **Info** (firmware, battery). Reached only via M. A fan can ignore it forever.
+
+**Modes: RACE and PLAY.** Modes wrap the state machine; they are not states. The experience begins the moment the weekend pack is loaded — not at the green flag — and the radio must survive the trip (vision §2: kids play at the airport and in the car; the weekend must arrive intact).
+
+- **RACE** — the pack is the world (the whole design above). **Boot default, always.** Pack mutations persist, as designed.
+- **PLAY** — the sandbox and the daily driver: the full legal band set (vision §1, "The radio lives between races"): aircraft 108–137 MHz AM — the airport is the best demo a radio has — marine VHF 156–162, FRS/GMRS 462.55–467.725, 2m ham 144–148, VHF 151–160, NOAA, broadcast FM; frequency entry and frequency scanning (the base's kept scanner); the pack browsable but **every change is ephemeral**: captures, lockouts, favorites, groups, my-driver are RAM-only and dropped on power-off or mode exit. The state line reads "◉ PLAY" instead of "◉ SCAN".
+- **The seal** (SETUP → Pack → Seal): while sealed, RACE refuses every pack mutation — capture save, lockout, favorite, group, my-driver — with a one-line "SEALED" status. This is the parent gesture: load the weekend, seal it, hand the radio to the kids. Power cycles, airport play, and car-ride mashing cannot change a sealed pack; unsealing is equally deliberate. (It is a parent gesture, not a security boundary — a determined child who can navigate SETUP can unseal. The guarantee is that *mashing buttons* cannot ruin the weekend.)
+- The seal only matters when a pack exists; an empty radio still captures (the empty-radio story, §4.5).
 
 ### 4.2 Key map
 

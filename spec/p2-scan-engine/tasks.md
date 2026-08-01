@@ -41,12 +41,12 @@ lockout bitmap) being in place.
 - [ ] My-driver (header `myDriver`) becomes the priority entry; interleave revisit
       every 8 entries (`FOLLOW_INTERLEAVE = 8`), tone-gated; no preemption of an
       already-landed exchange. Default ON when my-driver is set.
-- **Gate:** build; **(bench)** with a favorite transmitting intermittently, worst-case
+- **Gate:** build; **(hw)** with a favorite transmitting intermittently, worst-case
       latency ≈ 640 ms (measured via UART timestamps), no mid-exchange chopping.
 
 ## S5. CSQ hang guard (v1)
 - [ ] CSQ entry holding the scan > 5 s continuously → skipped for one full cycle.
-- **Gate:** host unit test (timer state machine, pure logic); **(bench)** open-mic test.
+- **Gate:** host unit test (timer state machine, pure logic); **(hw)** open-mic test.
 
 ## S6. Squelch tuning + adaptive (v0 / v1)
 - [ ] v0: race-tuned squelch defaults via `RADIO_ConfigureSquelchAndOutputPower`
@@ -59,13 +59,15 @@ lockout bitmap) being in place.
 ## S7. Signal meter
 - [ ] RSSI → 4 bars on the SCAN screen (row 5), mapped per band via S0/S9
       (`ENABLE_RSSI_BAR` machinery).
-- **Gate:** build; **(bench)** screenshots via `screenshot.c` over UART at known RSSI
+- **Gate:** build; **(hw)** screenshots via `screenshot.c` over UART at known RSSI
       levels (signal generator or second radio at varying distance).
 
 ## S8. Integration
 - [ ] Boot → SCAN resume; PTT HOLD/resume; long-PTT CAPTURE pre-fill (last-heard);
       `*` resume; F2 group cycle; `#`/long-9 favorite re-anchor; long-`*` lockout;
-      BRD/WX pause/resume; capture-save → universe rebuild; empty-universe state.
+      BRD/WX pause/resume; capture-save → universe rebuild; empty-universe state;
+      **PLAY mode: frequency-scan on play bands via the kept CSS scanner, RAM-only
+      mutations, boot returns to RACE**.
 - [ ] Full-diff review (`/review`) of the engine against the base.
 - **Gate:** build + review; **(hw)** P1 acceptance: a fan uses the radio for a full
       race without asking a question; scan never visibly "misses" a caution.

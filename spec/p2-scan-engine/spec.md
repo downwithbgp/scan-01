@@ -164,6 +164,7 @@ repurposed:
 | `#` / long-9 | Favorites cycle / my-driver jump (vision §4.2) — engine re-anchors the scan at that car |
 | long-`*` (HOLD) | Lockout toggle → bitmap update → skipped from next cycle |
 | BRD / WX | Scan pauses while in the sub-state; resumes on PTT/EXIT/`*` |
+| **PLAY mode** | The scan runs against the play bands via the kept frequency scanner (vision §4.1); all pack mutations are RAM-only stubs; boot returns to RACE |
 | LIST | Browse state; scan resumes on EXIT/`*` (vision §4.1) |
 | CAPTURE | Scan stopped; save-as-car adds the entry → universe rebuilt, joins current group (vision §4.5) |
 
@@ -189,7 +190,7 @@ repurposed:
 | Lockout | `gMR_ChannelExclude` (RAM, base resets at boot) | pack lockout bitmap (persisted, P1 spec §4.3) |
 | Squelch | `RADIO_ConfigureSquelchAndOutputPower`, 0x1E00/0x1E60 tables | race-tuned defaults (v0); RAM-learned offsets (v1) |
 | RSSI meter | `ENABLE_RSSI_BAR`, S0/S9 | 4-bar display |
-| CSS finder | `app/scanner.c` (`SCANNER_*`) | **kept** — capture's tone-find on typed frequencies |
+| CSS finder | `app/scanner.c` (`SCANNER_*`) | **kept** — capture's tone-find on typed frequencies + PLAY-mode frequency scanning (vision §4.1) |
 
 ## 11. Open questions (track-validation items)
 
@@ -210,7 +211,7 @@ repurposed:
 
 ## 12. Development & test strategy (the between-weekends loop)
 
-Race weekends cannot drive the development loop (vision §1.5). The engine is
+Race weekends cannot drive the development loop (vision §1, "The radio lives between races"). The engine is
 verifiable daily:
 
 - **Bench rig:** two K6s and (ideally) a signal generator. Tone-lock, dwell, hang,
@@ -227,4 +228,3 @@ verifiable daily:
 - **Track-validation remains only for what a bench cannot produce:** intermod and
   desense in a packed grandstand, weak-car landing against real noise, the final
   dwell value, and the fan-acceptance gate (vision §12 P1 gate).
-
