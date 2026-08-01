@@ -1,7 +1,7 @@
-# P1 Spec — Pack model & EEPROM layout (RaceScan edition)
+# P1 Spec — Pack model & EEPROM layout (Scan 01 edition)
 
 **Status:** v0.1 — spec for review
-**Applies to:** the RaceScan edition of the F4HWN v4.3 base (the vendored base — repo root)
+**Applies to:** the Scan 01 edition of the F4HWN v4.3 base (the vendored base — repo root)
 **Sources verified:** `settings.h` (EEPROM_Config_t, VFO_Info_t), `settings.c` (SETTINGS_SaveChannel, region map), `driver/eeprom.c` (8 KB @ 0xA0), `misc.h` (ChannelAttributes_t, MR_CHANNEL_LAST=199), `app/aircopy.c` (0x1E00 boundary)
 **Related:** `docs/design/hci-vision.md` (§4.5 capture, §5 screens, §6 pack, §7 RX-only)
 
@@ -12,7 +12,7 @@
 Locks down the **weekend pack** end-to-end:
 
 1. **Pack JSON v0** — the authoring format (what humans, packtool, and the community `race-packs/` repo write).
-2. **EEPROM binary layout** — how a pack lives in the radio's 8 KB EEPROM, byte by byte, reusing the base's channel records and using only regions the RaceScan edition owns.
+2. **EEPROM binary layout** — how a pack lives in the radio's 8 KB EEPROM, byte by byte, reusing the base's channel records and using only regions the Scan 01 edition owns.
 3. **Mapping rules** — pack → EEPROM (build) and EEPROM → pack (dump), including truncation, validation, and the capture lifecycle (`origin`/`verified`).
 4. **packtool v0 contract** — CLI commands and the UART region-write protocol.
 
@@ -24,7 +24,7 @@ Out of scope (later phases): scan-engine tuning (dwell/tone-lock/FOLLOW — P2),
 - **The library is not in the radio:** the radio holds one weekend's subset (≤ 64 cars / ≤ 24 stations, §4.3); the full per-series/per-track library lives in `race-packs/library/` and is assembled by packtool `compose` (§7).
 - **Never touch calibration**: EEPROM 0x1EC0–0x1FFF (RSSI cal, battery cal, VOX, build options) is read-only for packtool and the pack layer.
 - **No VFO/frequency mode**: VFO slots (0x0C80–0x0D5F) stay factory; freq entry exists only as the CAPTURE path.
-- **CHIRP coexistence**: channel records keep the base 16-byte format and 10-char names, so existing CHIRP/k5prog tooling still reads frequencies and names. RaceScan metadata lives in regions CHIRP never touches.
+- **CHIRP coexistence**: channel records keep the base 16-byte format and 10-char names, so existing CHIRP/k5prog tooling still reads frequencies and names. Scan 01 metadata lives in regions CHIRP never touches.
 
 ## 3. Pack JSON v0
 
@@ -60,24 +60,24 @@ Out of scope (later phases): scan-engine tuning (dwell/tone-lock/FOLLOW — P2),
 - `bandwidth`: `"narrow"` (default, 12.5 kHz — IndyCar rulebook 7.4.1.1) or `"wide"`.
 - `group`: `"A" | "B" | "C" | "ALL"` (scan groups). `favorite`: bool. `origin`: `"pack" | "captured" | "manual"`. `verified`: bool.
 - `venue`: entry index into `meta.venues` (default 0). `meta.venues` names the events in a multi-venue weekend (Brickyard + IRP); `track` is `venues[0]`. **v0 supports exactly two venues** — 3+ fold into venue 1 with a compose warning.
-- Stations: `kind` is `"broadcast" | "control" | "pa" | "officials" | "safety" | "radio" | "media" | "other"`; `"radio"` covers network feeds on UHF (MRN/PRN — e.g. MRN is 454.2 MHz at IMS, not commercial FM). `"digital": true` flags a feed RaceScan v0 cannot decode (it is listed but skipped by the scan).
+- Stations: `kind` is `"broadcast" | "control" | "pa" | "officials" | "safety" | "radio" | "media" | "other"`; `"radio"` covers network feeds on UHF (MRN/PRN — e.g. MRN is 454.2 MHz at IMS, not commercial FM). `"digital": true` flags a feed Scan 01 v0 cannot decode (it is listed but skipped by the scan).
 - `lockouts`: array of car numbers currently locked out of the scan.
 - Cap: **≤ 64 cars** (alternate frequencies count as entries, see §5.1) and **≤ 24 stations** (the IMS weekend alone needs 17: PA×3, media×3, radio×4, control×2, safety×2, officials×3).
 
-## 4. EEPROM layout (RaceScan edition)
+## 4. EEPROM layout (Scan 01 edition)
 
 Total 8 KB (0x0000–0x1FFF). The pack owns four regions; everything else is either base-owned or factory.
 
 | Region | Address | Size | Owner |
 |---|---|---|---|
-| Channel records (ch 0–199) | 0x0000 | 3200 | base 16-byte format (§4.1); RaceScan uses ch 0..(used-1) |
+| Channel records (ch 0–199) | 0x0000 | 3200 | base 16-byte format (§4.1); Scan 01 uses ch 0..(used-1) |
 | VFO slots | 0x0C80 | 224 | untouched (compiled out) |
 | Channel attributes | 0x0D60 | 207 | untouched (zero; scan lists compiled out) |
 | Settings block | 0x0E28–0x0F4F | ~296 | base gEeprom fields (subset used) |
 | FM broadcast channels | 0x0E40 | — | untouched (BRD presets come from StationMeta) |
-| **Channel names + team** | **0x0F50** | 200×16 | §4.2 — name (10 B, base-compatible) + team (6 B, RaceScan-only) |
+| **Channel names + team** | **0x0F50** | 200×16 | §4.2 — name (10 B, base-compatible) + team (6 B, Scan 01-only) |
 | **Pack table** | **0x1BD0** | ≤ 556 | §4.3 — header + CarMeta + StationMeta |
-| DTMF contacts | 0x1C00 | 512 | compiled out in RaceScan; part of pack-table space |
+| DTMF contacts | 0x1C00 | 512 | compiled out in Scan 01; part of pack-table space |
 | Aircopy | 0x1E00 | — | compiled out; keep clear |
 | Calibration / options | 0x1EC0–0x1FFF | 320 | **never written by packtool or the pack layer** |
 
@@ -85,9 +85,9 @@ The pack table fits in 0x1BD0–0x1DFF (560 B continuous): names end at 0x1BD0 (
 
 ### 4.1 Channel record (16 bytes, base format — `SETTINGS_SaveChannel`)
 
-RaceScan writes RX-only-safe values:
+Scan 01 writes RX-only-safe values:
 
-| Off | Size | Field | RaceScan value |
+| Off | Size | Field | Scan 01 value |
 |---|---|---|---|
 | +0 | 4 | RX frequency | **u32 LE Hz** (450.8875 MHz → `450887500` = 0x1AE3A94C) — the base stores plain Hz (`SETTINGS_SaveChannel` writes `freq_config_RX.Frequency` raw; cf. `RADIO_InitInfo(..., 43350000)`) |
 | +4 | 4 | TX offset | 0 |
@@ -104,15 +104,15 @@ RaceScan writes RX-only-safe values:
 
 ### 4.2 Channel name + team (16 B per channel at 0x0F50 + ch×16)
 
-- **Name (bytes 0–9, base-compatible 10 chars):** uppercase ASCII, composed by packtool as `LASTNAME <FIRST-INITIAL>` when a first name exists (`"BYRON W"`, `"TRUEX JR M"`), else last name only. Space-padded, no NUL needed (base trims on read; RaceScan also trims). Alts use `ALT <LASTNAME>` (`"ALT BYRON"`).
-- **Team (bytes 10–15, RaceScan-only):** uppercase team short name ≤ 6 chars (`"HMS"`, `"PENSKE"`), space-padded. CHIRP/k5prog never see these bytes; the base never reads them.
+- **Name (bytes 0–9, base-compatible 10 chars):** uppercase ASCII, composed by packtool as `LASTNAME <FIRST-INITIAL>` when a first name exists (`"BYRON W"`, `"TRUEX JR M"`), else last name only. Space-padded, no NUL needed (base trims on read; Scan 01 also trims). Alts use `ALT <LASTNAME>` (`"ALT BYRON"`).
+- **Team (bytes 10–15, Scan 01-only):** uppercase team short name ≤ 6 chars (`"HMS"`, `"PENSKE"`), space-padded. CHIRP/k5prog never see these bytes; the base never reads them.
 - The SCAN screen shows the full 10-char name at 16 px (the initial is part of the name — no parsing). The team line shows the 6-char team.
 
 ### 4.3 Pack table (0x1BD0)
 
 ```
 off  size  field
-0x00  4     magic "RSPK" (0x52 0x53 0x50 0x4B)
+0x00  4     magic "SC01" (0x53 0x43 0x30 0x31)
 0x04  1     format version = 0x01
 0x05  8     series, ASCII space-padded ("NASCARCUP", "IMSA    ", "INDYCAR ")
 0x0D  12    track — primary venue name, ASCII space-padded ("DAYTONA    ")
@@ -165,7 +165,7 @@ The base's `SETTINGS_FactoryReset` behavior around the pack table is wrong for u
 - **Partial reset** (`bIsAll=false`): preserves names (0x0F50–0x1C00) but wipes channel records (0x0000–0x0C7F) → a header-valid pack whose channels are 0xFF.
 - **Full reset** (`bIsAll=true`): wipes 0x0000–0x1DFF except DTMF/AES/welcome/voice regions → pack header + names erased, but CarMeta/StationMeta at 0x1C00+ survive as orphans.
 
-**The RaceScan edition must extend both paths to wipe 0x1BD0–0x1DFF** (magic gone → clean "NO PACK" state). Additionally, `PACK_Load` sanity-checks channel records (frequency within RX bands) so a stale header can never resurrect a broken pack.
+**The Scan 01 edition must extend both paths to wipe 0x1BD0–0x1DFF** (magic gone → clean "NO PACK" state). Additionally, `PACK_Load` sanity-checks channel records (frequency within RX bands) so a stale header can never resurrect a broken pack.
 
 ## 5. Mapping rules
 
@@ -199,7 +199,7 @@ Hard errors:
 - **cellular band-lock (ECPA): 824–894, 1710–1755, 1850–1990, 2110–2155 MHz → hard reject, always.**
 - counts > 64 cars / 24 stations; name > 10 chars or team > 6 after composition (unless auto-truncated with warning); tone not in `CTCSS_Options` / `DCS_Options`; station name > 4 chars.
 
-Warnings: duplicate frequency across entries (IndyCar rulebook 7.4.1.2 requires unique per-car freqs — flag, don't fail), number collides with a station name, digital station (not monitorable by RaceScan v0 — the scan skips it), missing driver/team fields, venue index ≥ 2 (folded into venue 1 by compose), venue-2 name > 8 chars (truncated in the binary), unverified pack (`verified: false` on the pack meta is fine — only entries carry the flag).
+Warnings: duplicate frequency across entries (IndyCar rulebook 7.4.1.2 requires unique per-car freqs — flag, don't fail), number collides with a station name, digital station (not monitorable by Scan 01 v0 — the scan skips it), missing driver/team fields, venue index ≥ 2 (folded into venue 1 by compose), venue-2 name > 8 chars (truncated in the binary), unverified pack (`verified: false` on the pack meta is fine — only entries carry the flag).
 
 ## 7. packtool v0 contract
 

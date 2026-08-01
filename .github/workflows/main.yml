@@ -1,4 +1,4 @@
-name: Build RaceScan
+name: Build Scan 01
 
 on:
   push:
@@ -13,19 +13,19 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Build the racescan edition
+    - name: Build the scan01 edition
       run: |
         docker build --build-arg ALPINE_TAG=3.22 -t uvk5 .
-        docker run -v "$PWD:/app" uvk5 /bin/bash /app/build-racescan.sh
+        docker run -v "$PWD:/app" uvk5 /bin/bash /app/build-scan01.sh
 
     - name: Verify the T1 gate (flash headroom >= 2K)
       run: |
-        SIZE=$(docker run -v "$PWD:/app" uvk5 arm-none-eabi-size f4hwn.racescan | tail -1 | awk '{print $1}')
+        SIZE=$(docker run -v "$PWD:/app" uvk5 arm-none-eabi-size f4hwn.scan01 | tail -1 | awk '{print $1}')
         echo "text: $SIZE B (gate: <= 59392 = 60K - 2K)"
         test "$SIZE" -le 59392
 
     - name: Upload firmware artifact
       uses: actions/upload-artifact@v4
       with:
-        name: racescan-firmware
-        path: f4hwn.racescan.packed.bin
+        name: scan01-firmware
+        path: scan01.packed.bin

@@ -1,12 +1,12 @@
-# P1 tasks — Pack model & EEPROM layout (RaceScan edition)
+# P1 tasks — Pack model & EEPROM layout (Scan 01 edition)
 
 Each task has a verification gate. Gates marked **(hw)** need real hardware and are the
 external acceptance criteria; everything else is build/review/test-able in this repo.
 
-## T1. RaceScan edition scaffold — DONE
-- [x] Makefile: `racescan` edition via `EDITION_STRING=RaceScan` + `compile-with-docker.sh racescan()`. Compile **out** (flags the base's own editions prove safe): SPECTRUM, F4HWN_SPECTRUM, VOX, AIRCOPY, AUDIO_BAR, ALARM, DTMF_CALLING, VOICE, TX_WHEN_AM, F_CAL_MENU, COPY_CHAN_TO_VFO, GAME, RESCUE_OPS. Compile **in**: NOAA, FMRADIO, SCREENSHOT, RX_TX_TIMER, RESUME_STATE. Deferred (latent base bugs on disable): BIG_FREQ, SCAN_RANGES, CUSTOM_MENU_LAYOUT, TX1750, FLASHLIGHT — revisit at T6.
-- [x] `ENABLE_FEAT_RACESCAN` guard — Makefile block **after** the `CFLAGS =` reset (earlier `+=` is wiped); verified in the compile flags.
-- **Gate (PASS):** docker build (alpine:3.22 + gcc-arm-none-eabi) → `f4hwn.racescan.packed.bin`; `arm-none-eabi-size`: text 57,644 + data 20 = 57,664 B of 60K flash (**3.8K headroom**); bss 6,132 + data 20 ≈ 6.1K of 16K RAM. TX reachability audit remains a T9 item (TX is still compiled in the base core; channel records are written TX-locked).
+## T1. Scan 01 edition scaffold — DONE
+- [x] Makefile: `scan01` edition via `EDITION_STRING=Scan 01` + `compile-with-docker.sh scan01()`. Compile **out** (flags the base's own editions prove safe): SPECTRUM, F4HWN_SPECTRUM, VOX, AIRCOPY, AUDIO_BAR, ALARM, DTMF_CALLING, VOICE, TX_WHEN_AM, F_CAL_MENU, COPY_CHAN_TO_VFO, GAME, RESCUE_OPS. Compile **in**: NOAA, FMRADIO, SCREENSHOT, RX_TX_TIMER, RESUME_STATE. Deferred (latent base bugs on disable): BIG_FREQ, SCAN_RANGES, CUSTOM_MENU_LAYOUT, TX1750, FLASHLIGHT — revisit at T6.
+- [x] `ENABLE_FEAT_SCAN01` guard — Makefile block **after** the `CFLAGS =` reset (earlier `+=` is wiped); verified in the compile flags.
+- **Gate (PASS):** docker build (alpine:3.22 + gcc-arm-none-eabi) → `f4hwn.scan01.packed.bin`; `arm-none-eabi-size`: text 57,644 + data 20 = 57,664 B of 60K flash (**3.8K headroom**); bss 6,132 + data 20 ≈ 6.1K of 16K RAM. TX reachability audit remains a T9 item (TX is still compiled in the base core; channel records are written TX-locked).
 
 ## T2. Band-lock enforcement
 - [ ] `PACK_FreqAllowed(freq_hz, mode)` — valid entry bands in both modes: 450000000–470000000, 162400000–162550000, 151000000–160000000, 108000000–137000000 (airband, AM only), 156000000–162000000 (marine), 462550000–467725000 (FRS/GMRS), 88000000–108000000 (broadcast path only); PRACTICE additionally permits frequency entry/scanning across that set plus 144000000–148000000 (2m); hard-reject 824–894 / 1710–1755 / 1850–1990 / 2110–2155 MHz (ECPA) in **both** modes.
@@ -14,7 +14,7 @@ external acceptance criteria; everything else is build/review/test-able in this 
 - **Gate:** pure function — host unit test (`tests/test_bandlock.c` or Python mirror) with boundary cases; `/prop-test` on the filter (random freqs, assert reject/allow classes + boundaries).
 
 ## T3. Pack layer (`settings_pack.c` / `settings_pack.h` — new)
-- [ ] Header read/validate (magic "RSPK", version, CRC16-CCITT) at boot; RAM arrays for cars/stations/lockouts/my-driver.
+- [ ] Header read/validate (magic "SC01", version, CRC16-CCITT) at boot; RAM arrays for cars/stations/lockouts/my-driver.
 - [ ] Writers: `PACK_SaveLockout`, `PACK_SaveFavorite`, `PACK_SetMyDriver`, `PACK_AddCapture` (writes channel record + name/team + CarMeta + counts + CRC; duplicate → `ALT` entry, never overwrite).
 - [ ] Channel-record writer using the base's packing (values per spec §4.1: Hz frequency, CTCSS index + `0x11` code type, TX_LOCK set).
 - [ ] Factory-reset extension: wipe 0x1BD0–0x1DFF in both reset modes (spec §4.4); `PACK_Load` sanity-checks channel frequencies.

@@ -1,4 +1,4 @@
-# Rams audit — RaceScan edition
+# Rams audit — Scan 01 edition
 
 **Status:** v0.1 — honest self-audit against Dieter Rams' 10 principles
 **Method:** each principle is scored **Strong** (designed AND evidenced), **Good**

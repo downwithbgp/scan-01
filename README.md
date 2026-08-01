@@ -23,19 +23,19 @@ The firmware source is the vendored F4HWN v4.3 base (Apache-2.0, upstream:
 armel/uv-k5-firmware-custom), trimmed (CMSIS reduced to the build's two include dirs;
 old `archive/` binaries dropped) and living at the repo root.
 
-## Building the RaceScan edition
+## Building the Scan 01 edition
 
 Docker is the supported toolchain path (no native arm-none-eabi needed):
 
 ```
 docker build --build-arg ALPINE_TAG=3.22 -t uvk5 .
-./compile-with-docker.sh racescan    # → compiled-firmware/f4hwn.racescan.packed.bin
+./compile-with-docker.sh scan01    # → compiled-firmware/f4hwn.scan01.packed.bin
 ```
 
-or directly: `docker run -v "$PWD:/app" uvk5 /bin/bash /app/build-racescan.sh`.
+or directly: `docker run -v "$PWD:/app" uvk5 /bin/bash /app/build-scan01.sh`.
 
 **T1 gate (passes):** text 57,644 B + data 20 of 60K flash (~3.8K headroom);
-RAM ~6.1K of 16K. The edition defines `ENABLE_FEAT_RACESCAN` (Makefile, after the
+RAM ~6.1K of 16K. The edition defines `ENABLE_FEAT_SCAN01` (Makefile, after the
 `CFLAGS =` reset — earlier `+=` gets wiped) for edition-specific code.
 
 Flag policy: only flags the base's own editions prove safe are disabled

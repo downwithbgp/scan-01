@@ -1,4 +1,4 @@
-# P2 tasks — Scan engine (RaceScan edition)
+# P2 tasks — Scan engine (Scan 01 edition)
 
 Each task has a verification gate. Gates marked **(hw)** need real hardware in a
 real RF environment; **(bench)** gates need only two radios on a bench — the

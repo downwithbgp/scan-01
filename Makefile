@@ -309,9 +309,9 @@ endif
 CFLAGS += -Wextra
 #CFLAGS += -Wpedantic
 
-# ---- RACESCAN EDITION (must be after the 'CFLAGS =' reset) ----
-ifeq ($(EDITION_STRING),RaceScan)
-	CFLAGS += -DENABLE_FEAT_RACESCAN
+# ---- SCAN01 EDITION (must be after the 'CFLAGS =' reset) ----
+ifeq ($(EDITION_STRING),Scan01)
+	CFLAGS += -DENABLE_FEAT_SCAN01
 endif
 
 CFLAGS += -DPRINTF_INCLUDE_CONFIG_H

@@ -170,8 +170,8 @@ game() {
         && cp f4hwn.game* compiled-firmware/"
 }
 
-racescan() {
-    echo "🏁 Compiling RaceScan..."
+scan01() {
+    echo "🏁 Compiling Scan 01..."
     docker run -v "$FIRMWARE_DIR:/app/compiled-firmware" "$IMAGE_NAME" /bin/bash -c "\
         cd /app && make -s \
         ENABLE_SPECTRUM=0 \
@@ -192,9 +192,9 @@ racescan() {
         ENABLE_FEAT_F4HWN_SCREENSHOT=1 \
         ENABLE_FEAT_F4HWN_RX_TX_TIMER=1 \
         ENABLE_FEAT_F4HWN_RESUME_STATE=1 \
-        EDITION_STRING=RaceScan \
-        TARGET=f4hwn.racescan \
-        && cp f4hwn.racescan* compiled-firmware/"
+        EDITION_STRING=Scan01 \
+        TARGET=scan01 \
+        && cp scan01* compiled-firmware/"
 }
 
 # ------------------ MENU ------------------
@@ -208,17 +208,17 @@ case "$1" in
     basic) basic ;;
     rescueops) rescueops ;;
     game) game ;;
-    racescan) racescan ;;
+    scan01) scan01 ;;
     all)
         bandscope
         broadcast
         basic
         rescueops
         game
-        racescan
+        scan01
         ;;
     *)
-        echo "Usage: BASE=alpine:<tag> $0 {clean|custom|standard|bandscope|broadcast|basic|rescueops|game|racescan|all}"
+        echo "Usage: BASE=alpine:<tag> $0 {clean|custom|standard|bandscope|broadcast|basic|rescueops|game|scan01|all}"
         echo "Examples: BASE=alpine:3.22 … | BASE=alpine:3.21 … | BASE=alpine:3.19 … | BASE=alpine:edge …"
         exit 1
         ;;

@@ -11,3 +11,7 @@ compile_commands.json
 k5_eeprom.raw
 f4hwn
 f4hwn.*
+
+# Scan 01 build artifacts
+scan01
+scan01.*

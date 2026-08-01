@@ -1,7 +1,7 @@
-# P2 Spec — Scan engine (RaceScan edition)
+# P2 Spec — Scan engine (Scan 01 edition)
 
 **Status:** v0.2 — spec for review
-**Applies to:** the RaceScan edition of the F4HWN v4.3 base (the vendored base — repo root)
+**Applies to:** the Scan 01 edition of the F4HWN v4.3 base (the vendored base — repo root)
 **Sources verified:** `app/chFrScanner.c` (channel-scan state machine; `scan_pause_delay_in_6_10ms = 100ms` in misc.c; fast-scan 90 ms; base comment "<= ~60 ms it misses signals (squelch response and/or PLL lock time)" at chFrScanner.c:361), `app/app.c` (`HandleIncoming` software tone gate via `g_CTCSS_Lost`/`g_CDCSS_Lost`, detection pause `scan_pause_delay_in_3_10ms` at app.c:170), `app/scanner.c` (CSS/frequency finder — kept for capture), `radio.c` (`RADIO_ConfigureSquelchAndOutputPower`, squelch tables at 0x1E00/0x1E60, `SquelchOpen*Thresh`), `settings.h` (`SCAN_RESUME_MODE`, `SCANLIST_PRIORITY_CH1/2`), `driver/bk4819.c` (noise/RSSI squelch, tone-lost flags, RSSI)
 **Related:** `docs/design/hci-vision.md` (§4 states, §5.3 SCAN screen, §8), `spec/p1-pack-eeprom/spec.md` (pack arrays, lockout bitmap, groups, venue bits)
 
@@ -27,7 +27,7 @@ Out of scope: the pack format (P1 spec), screens (vision §5), packtool, hardwar
 - **The scan IS the action-following.** Manual switching is one or two presses; the
   default experience is the radio landing on whoever is talking.
 - **One behavior, not a menu.** The base has `SCAN_RESUME_MODE` (CARRIER 250ms–20s /
-  STOP / TIMEOUT 5s–2m, F4HWN-extended). RaceScan has exactly one resume behavior,
+  STOP / TIMEOUT 5s–2m, F4HWN-extended). Scan 01 has exactly one resume behavior,
   fixed and hidden. No TO/CO/SE, no dwell settings, no squelch UI — ever.
 - **Tone-lock is a software gate on hardware flags.** The BK4819's squelch-open is
   noise/RSSI-based and tone-independent. The base gates tones in software:
@@ -180,7 +180,7 @@ repurposed:
 
 ## 10. Base seams
 
-| Concern | Base seam | RaceScan |
+| Concern | Base seam | Scan 01 |
 |---|---|---|
 | Channel scan | `app/chFrScanner.c` | universe + timing + landing replaced (BK4819 calls kept) |
 | Dwell | `scan_pause_delay_in_6_10ms` = 100 ms (misc.c); fast-scan 90 ms; base comment: ≤ 60 ms misses signals (chFrScanner.c:361) | `SCAN_DWELL_10MS` = 8 (80 ms, build-time) |

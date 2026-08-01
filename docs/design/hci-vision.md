@@ -1,4 +1,4 @@
-# HCI Vision — RaceScan Edition
+# HCI Vision — Scan 01 Edition
 
 **Status:** v0.1 — design vision, not a spec
 **Scope:** HCI reimagination for race-fan scanner firmware on Quansheng UV-K5/K6 hardware, plus the hardware v2 vision it implies
@@ -58,7 +58,7 @@ Green flag drops. The fan wants to hear their driver's team. They need it **now*
 
 Stock Quansheng and F4HWN are ham-radio firmware: VFO/MR modes, 63-entry menus, F-key chord combinations, jargon ("CTCSS", "STEP", "Offset", "Wide/Narrow", "VOX", "ScanRng"). Every one of those concepts is invisible to a race fan — but worse, they are *present*, competing for the same screen and the same buttons. A fan who opens the menu by accident is lost. A fan who can't find "scan" during a caution is angry.
 
-Rams: *"Good design makes a product understandable… it explains itself."* The current UI explains ham radio. The RaceScan edition must explain **racing**.
+Rams: *"Good design makes a product understandable… it explains itself."* The current UI explains ham radio. The Scan 01 edition must explain **racing**.
 
 ---
 
@@ -204,7 +204,7 @@ Rams: *"less but better — because it concentrates on the essential aspects."*
 
 Everything renders on the 8 px hardware line (`gFrameBuffer[7][128]`: one status line + seven 8 px frame lines, `driver/st7565.h`). Fonts are stored as strips of 8-row columns and blitted with one `memcpy` per frame line — the `gFontBig` pattern in `ui/helper.c`. **Nothing in the renderer needs to change for a new font; only a new data table.**
 
-| Font | Size | Glyphs | Flash | Origin | Role in RaceScan |
+| Font | Size | Glyphs | Flash | Origin | Role in Scan 01 |
 |---|---|---|---|---|---|
 | `gFontSmall` | 6×8 | 94 | ~560 B | base (`font.c`) | status strip, metadata, LIST names |
 | `gFontSmallBold` | 6×8 | 94 | ~560 B | base, opt-in | emphasis, lockout hints |
@@ -388,9 +388,9 @@ This is the part that makes the whole thing sustainable: hardware is commodity, 
 
 ## 7. Receive-only: the honest product decision
 
-- The RaceScan edition **cannot transmit. Period.** PTT is HOLD; TX paths are compiled out.
+- The Scan 01 edition **cannot transmit. Period.** PTT is HOLD; TX paths are compiled out.
 - Why: (a) the target user has no license and must never be able to key up on team/business frequencies — this is a liability and a moral hazard, not a feature; (b) it frees the biggest physical button for the most important fan action; (c) it saves flash and RAM for the scan engine.
-- The base codebase keeps full TX for the ham editions (F4HWN's existing model). RaceScan is a strict *edition*, built from the same source tree via the Makefile — exactly how F4HWN already ships RescueOps vs. Broadcast vs. Game.
+- The base codebase keeps full TX for the ham editions (F4HWN's existing model). Scan 01 is a strict *edition*, built from the same source tree via the Makefile — exactly how F4HWN already ships RescueOps vs. Broadcast vs. Game.
 
 ---
 
@@ -451,9 +451,9 @@ The stock K6 is good enough to ship the firmware **today**. But the user-visible
 
 The base is a fork of the F4HWN lineage (Apache-2.0) and already has the right seams:
 
-| Concern | F4HWN v4.3 seam | RaceScan change |
+| Concern | F4HWN v4.3 seam | Scan 01 change |
 |---|---|---|
-| Edition mechanism | Makefile `EDITION_STRING`, `ENABLE_FEAT_F4HWN*` flags, per-edition builds (RescueOps etc.) | add a **RaceScan** edition target; TX/VOX/DTMF/alarm compiled out |
+| Edition mechanism | Makefile `EDITION_STRING`, `ENABLE_FEAT_F4HWN*` flags, per-edition builds (RescueOps etc.) | add a **Scan 01** edition target; TX/VOX/DTMF/alarm compiled out |
 | App states | `app/` state machine (`app.c`, per-feature apps) | replace hot path with SCAN/HOLD/LIST/SETUP states |
 | Rendering | `ui/` (`ui.c`, `main.c`, `status.c`, fonts in `font.c`) | new 32 px racing-digits font; race screens in `ui/` |
 | Channels/settings | EEPROM layout in `settings.c`, CHIRP driver ecosystem | pack model mapped onto the channel map; packtool generates images |
@@ -465,7 +465,7 @@ The base is a fork of the F4HWN lineage (Apache-2.0) and already has the right s
 ## 12. Roadmap
 
 - **P0 — Validate (now, weeks):** collect real frequency data from 2–3 race weekends (Daytona, Sebring, Indy are the natural first three) **and a local bullring Saturday night (no big weekend required — Putnamville/WoO data is already the seed)**; interview 3–5 real fans; confirm the pack model against what a weekend actually needs; validate the digit-entry rules and the long-press label actions (§4.2/§4.3/§4.5) with real fans — watch them, don't interview them; simplify anything that confuses. *Gate: a verified sample pack for one track.*
-- **P1 — RaceScan firmware on stock K6 (weeks–months):** pack model + EEPROM layout; SCAN/HOLD/LIST/SETUP screens; key map (label-honest long-press actions: 0=BRD, 5=WX, 9=my driver, *=SCAN) incl. suffix letters; BRD/WX sub-states; **on-the-go capture (long-PTT catch, typed entry, save-as-car, duplicate→ALT rule, unverified flag, packtool export, multi-tap name editor)**; **demo-pack fallback + daily presets (airband/marine/FRS)**; RX-only edition build; packtool v0; boot/backlight/power behavior. *Gate: a fan (not a ham) uses it for a full race without asking a question — and the same fan used it on a Tuesday.*
+- **P1 — Scan 01 firmware on stock K6 (weeks–months):** pack model + EEPROM layout; SCAN/HOLD/LIST/SETUP screens; key map (label-honest long-press actions: 0=BRD, 5=WX, 9=my driver, *=SCAN) incl. suffix letters; BRD/WX sub-states; **on-the-go capture (long-PTT catch, typed entry, save-as-car, duplicate→ALT rule, unverified flag, packtool export, multi-tap name editor)**; **demo-pack fallback + daily presets (airband/marine/FRS)**; RX-only edition build; packtool v0; boot/backlight/power behavior. *Gate: a fan (not a ham) uses it for a full race without asking a question — and the same fan used it on a Tuesday.*
 - **P2 — Scan engine + data (months):** tone-lock landing, FOLLOW mode, adaptive squelch; **packtool desktop app (PC/Mac/Linux) with weekend composition — browse the library, pick the races you're attending, merge event packs + series stations, flash over USB**; open `race-packs/` v1 (Daytona, Sebring, Indy, Watkins Glen, Charlotte, Road America, plus library series like WoO **and weekly local-track packs — the community's constant source of fresh data**). *Gate: community submits a verified pack for a track we don't cover.*
 - **P3 — Hardware v2 (only if P1/P2 show demand):** open-hardware prototype per §10. *Gate: 100+ users of P1/P2.*
 
@@ -476,5 +476,5 @@ The base is a fork of the F4HWN lineage (Apache-2.0) and already has the right s
 3. **Hardware variants.** K5/K6/5R board revisions (this build targets the DP32G030 Cortex-M0; earlier boards differ in details), BK1080 presence — the edition must build and behave sanely across them (the base ifdefs much of this).
 4. **Data curation.** Frequency lists drift season to season; bad packs make the radio useless at the worst moment. The `race-packs` repo needs a verification workflow and honest "unverified" labeling.
 5. **Legal.** RX-only by design; US scanner law permits listening to the racing/broadcast bands. Two hard rules: (a) we must *never* ship a path to TX on team/business frequencies (the base codebase is TX-capable — the edition must strip it, not hide it); (b) the K6's wide RX includes US cellular bands, and receiving cellular audio is a felony (18 U.S.C. §2511 / ECPA) — the edition must band-lock cellular ranges (824–894, 1710–1755, 1850–1990, 2110–2155 MHz) so the radio physically cannot tune them.
-6. **Naming.** "RaceScan" is a working title; there are existing products/apps with similar names. Trademark check before any branding.
+6. **Naming.** **"Scan 01" is the chosen brand** (working title resolved — Rams-style product code, collision scan clean: no dominant prior use in the scanner space; `SC01` pack magic). A formal trademark check is still advisable before any commercial use; the name is descriptive + an index, so trademark strength is expected to be low — acceptable for a community project.
 7. **Open questions for the community:** should packs be per-series (NASCAR-only) or multi-series? Should the long-0 BRD action also receive *track PA* (which at some tracks is AM broadcast)? Is FOLLOW mode a favorite-car priority or should fans pick any car? Are the digital race-control feeds (e.g. IMS Safety 2, 461.4250) a gap we accept in v0? — all answerable in P0 validation.

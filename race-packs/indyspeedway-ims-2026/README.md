@@ -10,7 +10,7 @@ Per the sourcing rule it is attributed, not scraped from a paid guide.
   must be captured at the track).
 - **17 IMS stations**: PA (3), NBC/media (3), IndyCar Radio (4, incl. 454.0000 "analog with
   interference"), race control (2, tones 103.5 CTCSS / 032 DCS), safety (2 — SAF2 is
-  **digital**, flagged `digital: true` and skipped by the RaceScan scan), race director,
+  **digital**, flagged `digital: true` and skipped by the Scan 01 scan), race director,
   officials, observers.
 
 ## What this data already changed in the spec

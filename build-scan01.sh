@@ -1,5 +1,5 @@
 #!/bin/bash
-# RaceScan edition build (mirrors compile-with-docker.sh racescan())
+# Scan 01 edition build (mirrors compile-with-docker.sh scan01())
 # T1 flag policy: only disable flags the base's own editions prove safe
 # (SPECTRUM/VOX/AIRCOPY/AUDIO_BAR per 'basic'); everything else stays at
 # Makefile defaults — several 'creative' disables (BIG_FREQ, SCAN_RANGES)
@@ -25,7 +25,7 @@ make \
   ENABLE_FEAT_F4HWN_SCREENSHOT=1 \
   ENABLE_FEAT_F4HWN_RX_TX_TIMER=1 \
   ENABLE_FEAT_F4HWN_RESUME_STATE=1 \
-  EDITION_STRING=RaceScan \
-  TARGET=f4hwn.racescan \
+  EDITION_STRING=Scan01 \
+  TARGET=scan01 \
   2>&1 | grep -v '^arm-none-eabi-gcc -c' | tail -30
-arm-none-eabi-size f4hwn.racescan
+arm-none-eabi-size scan01
