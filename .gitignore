@@ -1,0 +1,3 @@
+# F4HWN v4.3 reference source (zip + extraction) — kept locally, not committed (~90 MB).
+# Decide on vendoring strategy (submodule / vendor dir) when implementation starts.
+F4HWN/
