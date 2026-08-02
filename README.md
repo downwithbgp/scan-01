@@ -113,15 +113,32 @@ viewable screenshots as a CI artifact (scan01-screenshots).
 CI runs these on every push, then builds the firmware and checks the
 flash gate.
 
+### What's implemented (all host-verified, firmware builds green)
+
+* **The Scan 01 interface** — SCAN/HOLD/LIST/CAPTURE/BRD/WX/SETUP, the
+  32 px racing-digits font, the multi-tap name editor, the venue
+  dividers, the boot identity screen. The stock ham UI is compiled out.
+* **The pack layer** — EEPROM layout, the demo-pack fallback, the seal,
+  PRACTICE mode, capture with the decoded tone, lockouts, my-driver.
+* **The scan engine** — 80 ms dwell, tone-lock landing (foreign tones
+  skipped), 250 ms hang with no-chop, the my-driver FOLLOW interleave
+  (640 ms worst case), the CSQ open-mic guard, group filters (F2).
+* **The packtool** — validate/build/diff/import/compose over the
+  community data, dump/flash over the k5prog UART protocol.
+* **The headless radio** — every screen is generated and pixel-asserted
+  without hardware; the sim lands signals, captures, and scans.
+
 ### Why shouldn't I use Scan 01 yet?
 
 * There are no releases and no stable binary. Flashing today means
   building from source.
-* The scan engine, the pack layer, and packtool are not implemented.
-  The radio currently runs the base F4HWN UI, not the Scan 01 interface.
+* No hardware validation yet: the (hw) gates — real-glass screenshots,
+  the dump/flash round-trip, the two-radio bench tests, and the fan
+  hand-off — need a radio in a hand. Everything is host-verified;
+  nothing has been turned on.
 * The receiver is a $25 wide-open front end. In a packed grandstand it
-  will hear everything, including things you don't want. FM works; a
-  tuned front end waits for the hardware v2 (vision doc §10).
+  will hear everything, including things you don't want. A tuned front
+  end waits for the hardware v2 (vision doc §10).
 * 2m ham (144–148 MHz) tuning is PRACTICE-mode only.
 
 ### Data

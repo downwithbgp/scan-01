@@ -8,9 +8,9 @@ external acceptance criteria; everything else is build/review/test-able in this 
 - [x] `ENABLE_FEAT_SCAN01` guard — Makefile block **after** the `CFLAGS =` reset (earlier `+=` is wiped); verified in the compile flags.
 - **Gate (PASS):** docker build (alpine:3.22 + gcc-arm-none-eabi) → `f4hwn.scan01.packed.bin`; `arm-none-eabi-size`: text 57,644 + data 20 = 57,664 B of 60K flash (**3.8K headroom**); bss 6,132 + data 20 ≈ 6.1K of 16K RAM. TX reachability audit remains a T9 item (TX is still compiled in the base core; channel records are written TX-locked).
 
-## T2. Band-lock enforcement — function DONE, wiring pending
+## T2. Band-lock enforcement — DONE
 - [x] `PACK_FreqAllowed(freq_hz, mode)` in `pack_bandlock.c/h` — entry bands (88–108, 108–137, 151–162 [dirt+marine union], 162.4–162.55, 450–470 [incl. FRS]) valid in both modes; 2m 144–148 PRACTICE-only; cellular 824–894 / 1710–1755 / 1850–1990 / 2110–2155 hard-rejected in both modes, always (ECPA). In the edition build (Makefile OBJS, Scan01-gated).
-- [ ] Wire into every tune path: BK4819 set, CAPTURE preview, BRD, WX. On reject: status flash + no tune. — **sequenced with the features that call them (T6 screens, T7 capture, S-tasks scan engine); no base tune path is guarded yet because the base's own scanning must keep working until the scan engine replaces it.**
+- [x] Wired into every tune path: the typed-jump tune (scan01_ui TuneFreq), the CAPTURE typed-entry + long-PTT prefill, pack load, and capture-save all go through `PACK_FreqAllowed`; on reject: "BAND LOCKED" flash + no tune. The base's own tune paths are unreachable (the edition's UI owns every tune point). — **sequenced with the features that call them (T6 screens, T7 capture, S-tasks scan engine); no base tune path is guarded yet because the base's own scanning must keep working until the scan engine replaces it.**
 - **Gate (PASS):** host test `tests/test_bandlock.c` — gcc -Wall -Werror: **814,958 checks, 0 failures** (17 real-world cases incl. the 2m RACE/PRACTICE split; every band edge ±1 Hz, both modes; 400k random freqs × 2 modes vs an independent classifier [soundness + completeness] + mode monotonicity). Firmware build green; function currently gc-sections-stripped (no caller yet) — 0 B delta until wiring pulls it in.
 
 ## T3. Pack layer (`settings_pack.c` / `settings_pack.h`) — DONE
@@ -56,7 +56,6 @@ external acceptance criteria; everything else is build/review/test-able in this 
 - **Gate (PASS):** build clean both editions; firmware 54,852 ≤ 60,928 (well under); host suites: 815,422 + 28 (edit) = **815,450 checks, 0 failures** (key 240, edit 28, pack 195, band-lock 815,004, font 155). Review fixes: BRD teardown on every exit path (M/HOME/WX), EDIT refuses when sealed + any save attempt leaves the editor, contrast/invert persist via SETTINGS_SaveSettings.
 - **The headless radio — screenshots without hardware:** with the (hw) screenshot gate unavailable, `tests/sim_radio.c` + `tests/sim_stubs.c` drive the REAL UI (scan01_ui + key layer + pack + fonts + ui/helper.c) against stubbed hardware and assert the pixel budgets: right-aligned number zones, the whitespace rule, LIST selection inversion, venue rules, NO-PACK boot. **15 checks, 0 failures**; every screen dumps as P4 PBM → PNGs + an index page via `tools/pbm2png.py`, uploaded as a CI artifact on every push. It already caught three real bugs: the multi-tap window tick never ran (names would never commit on hardware), the strike/rule lines were 8 px low (UI_DrawLineBuffer y is content-relative), and a LIST window clamp at the top. The (hw) screenshot gate remains pending but is no longer the only way to see the screens.
 
-## T7. Capture save flow
 
 ## T7. Capture save flow — DONE (hw end-to-end pending)
 - [x] **Prefill from the air with the tone**: long-PTT decodes the live signal via `BK4819_GetCxCSSScanResult` + `DCS_GetCtcssCode`/`DCS_GetCdcssCode` (the base's own mapping); the CAPTURE screen shows it on the number zone's left margin — `T 94.8` (CTCSS deci-Hz) / `D 271` (DCS octal) — refreshed on entry AND while typing (it tracks the live signal). The sim stubs the decode and asserts the tone line + the saved tone index.
@@ -74,11 +73,10 @@ external acceptance criteria; everything else is build/review/test-able in this 
 - [x] **compose** — multi-event weekend assembly with venue stamping, station dedupe, cross-event car ALT merging, and the capacity trade-off report; the library fixtures (woo-sprints, daily-presets — the latter's 5-char station names fixed to the 4-char field) validate as buildable.
 - [x] Tone tables drift-guarded: the embedded CTCSS/DCS tables are regenerated from dcs.c and a test parses dcs.c to prove they never diverge (it caught my 0x87/0x8A typo).
 - **Gate (PASS):** pytest 22 tests, 0 failures; `packtool validate` on the IMS pack exits 0 with the shared-frequency warning; the golden round-trip is byte-exact on every structured region. (hw) `dump`/`flash` against a real radio remains pending.
-## T9. Integration pass
-- [ ] Boot → SCAN → HOLD → capture → save → reboot → lockout persists → dump → pack round-trip.
-- [ ] Full-diff review (`/review`) of the edition against the base (no stray TX/DTMF/spectrum code reachable).
-- **Gate:** build + review; **(hw)** P1 acceptance: a fan (not a ham) uses the radio for a full race without asking a question; packtool round-trip on the real radio.
-
+## T9. Integration pass — host side DONE (hw items pending)
+- [x] Boot → SCAN → HOLD → capture → save → lockout → dump → pack round-trip: the sim drives the whole flow (31 checks) and the packtool's golden test proves the binary round-trip; **reboot persistence + the real-radio dump round-trip are (hw)**.
+- [x] **RX-only audit (no stray TX reachable):** every TX entry point is dead in this build — the DTMF setter (`ENABLE_DTMF_CALLING=0`), the alarm/TX1750 paths (**now actually compiled out: `ENABLE_TX1750=0` added to the scan01 build after the review caught the Makefile default of 1**), the VOX path, `rega` (not built). `FUNCTION_Select(FUNCTION_TRANSMIT)` would key the PA via `FUNCTION_Transmit()` (functions.c) — so the protection is the dead entry points, not the `FUNCTION_NOP` backstop (which only guards the main loop). The physical PTT is consumed by the Scan 01 key layer (HOLD/CAPTURE — never TX); channel records carry TX_LOCK; the band-lock rejects cellular in both modes. **The edition cannot transmit.**
+- **Gate (host PASS):** build + the audit above + the sim flow. **(hw)** P1 acceptance: a fan (not a ham) uses the radio for a full race without asking a question; packtool round-trip on the real radio.
 ## T10. Spec sync
 - [ ] Update `docs/design/hci-vision.md` §11 seam table + roadmap P1 with actuals; note any spec deviations found during T1–T9.
 - **Gate:** doc diff reviewed; deviations (if any) flagged as follow-ups, not silently absorbed.

@@ -16,7 +16,7 @@ Locks down the **weekend pack** end-to-end:
 3. **Mapping rules** — pack → EEPROM (build) and EEPROM → pack (dump), including truncation, validation, and the capture lifecycle (`origin`/`verified`).
 4. **packtool v0 contract** — CLI commands and the UART region-write protocol.
 
-Out of scope (later phases): scan-engine tuning (dwell/tone-lock/FOLLOW — P2), adaptive squelch, hardware v2, CHIRP-driver changes.
+Out of scope (later phases): adaptive squelch (P2 v1), hardware v2, CHIRP-driver changes. (The scan engine — dwell/tone-lock/FOLLOW — shipped in P2; see spec/p2-scan-engine.)
 
 ## 2. Non-goals & hard constraints
 
@@ -244,7 +244,7 @@ packtool *never* writes outside the pack-owned regions (§4); `dump` reads every
 
 ## 10. What this spec deliberately does NOT decide
 
-- Scan engine parameters (P2), FOLLOW mode, adaptive squelch.
+- Scan engine parameters (dwell/tone-lock/hang — shipped in P2 with P0 track-validation), adaptive squelch (P2 v1).
 - The 32 px racing-digits font bitmaps (P1 task 4, vision §5.6).
 - BRD/WX screen details (vision §5.10 — implemented per that spec).
 - Hardware v2 storage (P3 — same JSON, different binary).

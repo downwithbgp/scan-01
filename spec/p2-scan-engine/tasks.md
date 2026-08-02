@@ -70,4 +70,5 @@ lockout bitmap) being in place.
 ## S9. Spec sync — DONE (bench-rig doc pending)
 - [x] This file records the actuals; the spec's constants and the seam table are
       current (the engine bypasses CHFRSCANNER; the base's HandleIncoming tone
-      gate stays wired). `docs/bench-rig.md` deferred to the (hw) bench session.
+      gate stays wired). `docs/bench-rig.md` is written (2026-08); its (bench)
+      gates wait for two radios.
