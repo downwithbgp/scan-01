@@ -27,12 +27,13 @@ external acceptance criteria; everything else is build/review/test-able in this 
 - [x] Generator committed; NOT a `.fon` — the Python art source + generator replaces the base's Windows `.fon` pipeline.
 - **Gate (host PASS; hw PENDING):** `tests/test_font.c` — 155 checks, 0 failures (advance table, per-glyph ink integrity, width math incl. "29A"=48, right-alignment property test — ink bounds computed from the glyph data, no clipping, no ink outside the 4-strip block). Firmware size unchanged (60,120 — the font is gc-stripped until T6 wires it); font data measures 2,413 B. **(hw)** screenshots via `screenshot.c` over UART, reviewed against §5.6 (glyph density, "29A" spacing) — needs a real radio.
 
-## T5. Key handling
-- [ ] **Long-EXIT = HOME**: from any state, any mode → LIST in RACE mode (exits PRACTICE, discarding the practice session); while typing, long-EXIT still clears the entry first (base convention).
-- [ ] Long-press timers: PTT hold (~0.8 s → CAPTURE), label long-presses (0/5/9/M/*/F1/F2), suppressed while a digit entry is pending (spec: labels are a promise, not a trap).
-- [ ] Typing state machine: 1–3 digits + optional suffix letter (▲/▼ cycles A–Z), `*` = decimal point, EXIT delete / long-EXIT clear, timeout commit, no-car → "tune as frequency?" prompt.
-- [ ] Key map per vision §4.2 table (short = digit/nav; long = printed label).
-- **Gate:** build; behavior matrix (state × key × press-type) reviewed against the §4.2 table; **(hw)** fan hand-off test in P0/P1 gate.
+## T5. Key handling — DONE (hw hand-off pending)
+- [x] `scan01_keys.c/h` — the key layer: maps (state × key × press-type) → action per the vision §4.2 table, pure logic, no hardware calls. States: SCAN/HOLD/LIST/SETUP/BRD/WX/CAPTURE. Actions: PTT (HOLD/RESUME/CAPTURE/SAVE), label long-presses (0=BRD, 5=WX, 9=MYDRIVER, *=LOCKOUT, EXIT=HOME, M=KEYLOCK, SIDE1=MUTE_TOGGLE), nav, typing.
+- [x] **F1/F2 = the two side keys** (KEY_SIDE1/KEY_SIDE2 — the base has no physical F1/F2); vision §4.2 table annotated.
+- [x] **PTT hold timer** (~0.8 s → CAPTURE, layer-owned — the base treats PTT as press/release-only); quick tap = HOLD/RESUME; action lands on release; stale holds die on state change.
+- [x] **Label-vs-digit conflict** resolved: a held digit is a label long-press only when the buffer holds exactly that single digit (a clean hold from idle) — labels are a promise, not a trap; mid-entry holds are suppressed.
+- [x] **Typing state machine**: 1–3 digits + optional suffix (▲/▼ cycles A–Z, wraps, repeats on hold), `*` = decimal point (once; ≤3 int digits, ≤5 frac), EXIT delete / long-EXIT clear, 1.5 s timeout commit (PollCommit API — the tick can't return actions), no auto-commit in CAPTURE, PTT/M/F2/# abandon the entry (PTT wins), F1 mid-entry keeps it (harmless), WX never configures, SETUP is a form (nav/back/* only).
+- **Gate (PASS):** build green (firmware unchanged, 60,120 — the layer is gc-stripped until T6 wires it; scan01_keys.o = 1,093 B); behavior matrix in `tests/test_keys.c` — **231 checks, 0 failures** (per-state matrices vs §4.2, PTT timing at 79/80 ticks, typing scenarios, conflict rules, grammar holes: no digit/point after a suffix, auto-commit restored after CAPTURE); reviewed against the §4.2 table. **(hw)** fan hand-off test lands in the P0/P1 gate.
 
 ## T6. Screens
 - [ ] SCAN / HOLD (vision §5.3 pixel budget — status strip, 32 px number zone, name 16 px, team 8 px, freq+signal, state line, whitespace row).

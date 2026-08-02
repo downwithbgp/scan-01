@@ -217,6 +217,7 @@ OBJS += pack_bandlock.o
 OBJS += settings_pack.o
 OBJS += font_racing.o
 OBJS += font_racing_data.o
+OBJS += scan01_keys.o
 endif
 
 ifeq ($(OS), Windows_NT) # windows

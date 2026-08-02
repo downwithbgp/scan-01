@@ -144,8 +144,8 @@ Solid arrows: one press. Long-press PTT (from SCAN, HOLD, or LIST) opens CAPTURE
 | **UP / DOWN** | → LIST (browse) | prev / next car | scroll list | change value |
 | `*` short / long (label SCAN) | resume scan (no-op) / — | → SCAN / lockout this car | → SCAN / lockout selected | → SCAN / — |
 | `#` (label F) | cycle favorites | cycle favorites | cycle favorites | — |
-| **F1** short / long | MUTE 10 s / toggle MUTE | same | same | — |
-| **F2** short / long | cycle scan group / — | same | same | — |
+| **F1** short / long (SIDE1) | MUTE 10 s / toggle MUTE | same | same | — |
+| **F2** short / long (SIDE2) | cycle scan group / — | same | same | — |
 | **M** short / long | → SETUP / key lock | → SETUP / key lock | → SETUP / key lock | back / — |
 | **EXIT** (short / long) | (no-op) / → HOME (LIST, RACE mode) | → SCAN / → HOME | → SCAN / → HOME | back / → HOME |
 
