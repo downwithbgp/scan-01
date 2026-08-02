@@ -52,13 +52,13 @@ jobs:
         test "$SIZE" -le 60928
 
     - name: Upload firmware artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: scan01-firmware
         path: scan01.packed.bin
 
     - name: Upload the headless-radio screenshots
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: scan01-screenshots
         path: screenshots/
