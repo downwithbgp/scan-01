@@ -32,21 +32,21 @@ Real signals can't be scripted, but they close most of the hardware gates:
 - **The fan hand-off, part 1** — hand the radio to someone who is not a
   ham; the passive bench is a real radio with real signals to listen to.
 
-## Phase 2 — the active bench (conducted, no radiation → no licence)
+## Phase 2 — the active timing tests: DEFERRED TO THE TRACK (decision 2026-08)
 
 The precise timing gates — dwell, decode hold, tone-lock, hang, FOLLOW,
-the CSQ guard — need a *controlled* RF stimulus. That stimulus goes
-**through a coax cable and an attenuator into the antenna port**; nothing
-is radiated, so no licence is required. Two tooling options:
+the CSQ guard — need a *controlled* RF stimulus. The project has no
+generator and no licence, and the decision is to validate the timing on
+**real track signals** (IRP Saturday nights, Indy 500 May 2026) with the
+sim as the reference until then. The timing logic itself is host-verified
+(2048 engine checks + the sim's landing scenario); the track confirms the
+constants on real RF.
 
-- **A signal generator** (or a borrowed service monitor — the classic
-  tool) with CTCSS/DCS capability: the professional answer.
-- **An SDR with a TX output** (HackRF One class, ~$300) at −20 dBm
-  through 40–50 dB of attenuation → −60 dBm at the radio: fully
-  software-defined CTCSS/DCS/modulation on exactly 450.000–470.000 MHz.
-  It doubles as a spectrum analyzer for the grandstand-desense study.
-
-The measurements (docs referenced in the S-records):
+If the timing questions become blocking before the track, the legal
+conducted option remains open: a signal generator (or a HackRF-class SDR)
+through an attenuator into the antenna port — nothing radiates, so no
+licence applies — with CTCSS/DCS on exactly 450.000–470.000 MHz. The
+measurement checklist (from the S-records) would be:
 
 1. **Dwell / decode hold / hang (S2):** scripted 300 ms bursts — the walk
    advances ~80 ms/entry; the candidate pauses ~200 ms; audio opens

@@ -37,8 +37,8 @@ lockout bitmap) being in place.
       engine's tick); foreign tones skip the entry.
 - [x] CSQ entries land on carrier-only (the CSQ hang guard caps the open-mic risk, S5).
 - **Gate (PASS):** host tests cover the gate paths; the sim lands a tone'd signal
-      end to end. **(bench)** audio test via a conducted signal generator
-      (docs/bench-rig.md Phase 2) remains pending.
+      end to end. **(bench)** audio test is
+      deferred to the track (docs/bench-rig.md Phase 2).
 ## S4. FOLLOW mode (v1) — DONE
 - [x] The my-driver car is always in the walk (even outside the group filter) and is
       revisited every 8 entries (`SCAN_FOLLOW_INTERLEAVE`), worst-case silence
