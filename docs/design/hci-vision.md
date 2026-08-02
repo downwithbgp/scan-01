@@ -273,7 +273,7 @@ Four pages, 8 px rows (seven visible), UP/DOWN + knob to edit, M to move between
 The only new font in the whole edition. Spec:
 
 - **36 glyphs: 0–9 plus A–Z.** Car numbers are alphanumeric — "29A", "13F" (§4.3) — and the suffix letter renders at the same 32 px height, door-number style. Station tags stay 8 px caps.
-- **Metrics:** 32 px tall (4 strips of 8), cap height ~24 px; digits 18 px advance ("1" narrowed to 12 px), suffix letters 14 px. "29A" = 18+18+14 + spacing ≈ 54 px — leaves room for the name block.
+- **Metrics:** 32 px tall (4 strips of 8), cap height ~24 px; digits 16 px advance ("1" narrowed to 12 px), suffix letters 14 px (M, W = 16). "29A" = 16+1+16+1+14 = 48 px — leaves room for the name block. (The art in `tools/fontgen_racing.py` is the source of truth; the 18 px estimate in the first draft was superseded by the drawn glyphs.)
 - **Style:** heavy, slightly condensed grotesque — the feel of a race-car door number. Uniform stroke weight (1-bit: no thin parts), open counters so "0", "8", "9" never fill in on a coarse LCD.
 - **Storage & rendering:** 4 strips × width bytes per glyph, blitted with four `memcpy`s into consecutive frame lines — exactly the `gFontBig` pattern, no renderer changes.
 - **Cost:** ~36 × 4 × ~16 ≈ 2.2 KB flash. Generated through the existing `utils/` font pipeline (`.fon` → C tables).

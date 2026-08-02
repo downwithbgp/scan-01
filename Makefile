@@ -215,6 +215,8 @@ OBJS += main.o
 ifeq ($(EDITION_STRING),Scan01)
 OBJS += pack_bandlock.o
 OBJS += settings_pack.o
+OBJS += font_racing.o
+OBJS += font_racing_data.o
 endif
 
 ifeq ($(OS), Windows_NT) # windows

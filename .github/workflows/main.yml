@@ -13,12 +13,18 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Run host tests (band-lock, pack layer)
+    - name: Guard the generated font (art/data drift)
+      run: |
+        python3 tools/fontgen_racing.py | diff -q - font_racing_data.c
+
+    - name: Run host tests (band-lock, pack layer, racing font)
       run: |
         gcc -Wall -Werror -Wextra -I. tests/test_bandlock.c pack_bandlock.c -o /tmp/test_bandlock
         /tmp/test_bandlock
         gcc -Wall -Werror -Wextra -I. tests/test_pack.c settings_pack.c pack_bandlock.c -o /tmp/test_pack
         /tmp/test_pack
+        gcc -Wall -Werror -Wextra -I. tests/test_font.c font_racing.c font_racing_data.c -o /tmp/test_font
+        /tmp/test_font
 
     - name: Build the scan01 edition
       run: |

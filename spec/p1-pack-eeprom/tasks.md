@@ -21,11 +21,11 @@ external acceptance criteria; everything else is build/review/test-able in this 
 - [x] **Layout fixes found by testing (pre-release, spec updated):** header pad 0x3C→0x40 + fixed StationMeta base (captures never relocate stations) + cars at ch 0–63, stations at ch 64–87 (captures never collide) + all EEPROM writes as 8-aligned chunked RMW (24C64 page-wrap).
 - **Gate (PASS):** host tests 166 checks, 0 failures (CRC vector 0x29B1, demo install/reload byte-exact, capture/ALT/full/seal/practice, lockout+favorite+my-driver round-trips, corruption→demo, CRC valid after every mutation). Firmware build green. **Flash budget:** text 60,120 + data 20 (pack layer ≈ 3.1 KB; the DTMF 5-tone RX chain is gated out of the edition, −300 B); headroom 1.3 KB < the old 2K T1 margin — CI gate moved to a 512 B no-brick floor; T6 must reclaim the ~9.3 KB stock menu stack (`ui/menu.o` + `app/menu.o`) per the plan. **Build hygiene:** build-scan01.sh now cleans stale objects first — flag changes do not trigger make rebuilds (caught as a stale-misc.o link error).
 
-## T4. Racing-digits font (36 glyphs) + renderer
-- [ ] `gFontRacingDigits[36]`: 0–9, A–Z, 32 px tall (4 strips), digits 18 px advance ("1" = 12), letters 14 px (vision §5.6).
-- [ ] `UI_PrintRacingNumber(zone, string)` — right-aligned, 4-strip blit per the `gFontBig` pattern; NUL-terminated input.
-- [ ] Generate via the existing `utils/` pipeline; commit the `.fon` source.
-- **Gate:** build + size report (~2.2 KB); **(hw)** render test screens dumped via `screenshot.c` over UART and reviewed against the §5.6 spec (glyph density, "29A" spacing).
+## T4. Racing-digits font (36 glyphs) + renderer — DONE (hw render gate pending)
+- [x] 36 glyphs (0–9, A–Z), 32 px tall (4 strips), heavy condensed grotesque, hand-drawn in `tools/fontgen_racing.py` (the committed art IS the font source; `python3 tools/fontgen_racing.py > font_racing_data.c` regenerates). Advances: digits 16 ("1" = 12), letters 14 (M/W = 16), 1 px spacing — vision §5.6 updated (18 px draft estimate superseded by the art).
+- [x] `RACING_PrintNumber(fb, line, right_x, text)` — right-aligned, 4-strip memcpy blits per the `gFontBig` pattern; `RACING_TextWidth()`; underflow-clamped.
+- [x] Generator committed; NOT a `.fon` — the Python art source + generator replaces the base's Windows `.fon` pipeline.
+- **Gate (host PASS; hw PENDING):** `tests/test_font.c` — 155 checks, 0 failures (advance table, per-glyph ink integrity, width math incl. "29A"=48, right-alignment property test — ink bounds computed from the glyph data, no clipping, no ink outside the 4-strip block). Firmware size unchanged (60,120 — the font is gc-stripped until T6 wires it); font data measures 2,413 B. **(hw)** screenshots via `screenshot.c` over UART, reviewed against §5.6 (glyph density, "29A" spacing) — needs a real radio.
 
 ## T5. Key handling
 - [ ] **Long-EXIT = HOME**: from any state, any mode → LIST in RACE mode (exits PRACTICE, discarding the practice session); while typing, long-EXIT still clears the entry first (base convention).

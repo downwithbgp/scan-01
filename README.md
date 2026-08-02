@@ -84,6 +84,8 @@ Host tests (band-lock, pack layer):
     $ /tmp/test_bandlock
     $ gcc -Wall -Werror -Wextra -I. tests/test_pack.c settings_pack.c pack_bandlock.c -o /tmp/test_pack
     $ /tmp/test_pack
+    $ gcc -Wall -Werror -Wextra -I. tests/test_font.c font_racing.c font_racing_data.c -o /tmp/test_font
+    $ /tmp/test_font
 
 CI runs these on every push, then builds the firmware and checks the
 flash gate.
