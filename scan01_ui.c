@@ -942,6 +942,7 @@ void SCAN01_UI_Tick10ms(void)
     if (g_mute_10ms > 0)
         if (--g_mute_10ms == 0)
             MuteOff();                      /* the 10 s mute expires */
+    SCAN01_EDIT_Tick10ms();                 /* the multi-tap same-key window */
     SCAN01_KEYS_Tick10ms();
 }
 
@@ -1058,9 +1059,14 @@ static void RenderList(void)
     UI_DisplayStatus();
     UI_DisplayClear();
 
-    /* three 16 px rows: sel-1, sel, sel+1 (vision §5.4); selection inverted */
+    /* three 16 px rows: sel-1, sel, sel+1 (vision §5.4); selection inverted.
+     * Clamp the window at the top so the selection sits in the FIRST block —
+     * a selection floating in the middle at the list's top reads as broken. */
+    int16_t start = g_list_sel - 1;
+    if (start < 0)
+        start = 0;
     for (int r = 0; r < 3; r++) {
-        int16_t idx = g_list_sel - 1 + r;
+        int16_t idx = start + r;
         uint8_t row = (uint8_t)(r * 2);
         bool selected = (idx == g_list_sel);
 
@@ -1090,7 +1096,7 @@ static void RenderList(void)
                 char div[15];
                 snprintf(div, sizeof(div), "- %s -", PACK_Venue2());
                 PrintSmallAt(row + 1, 20, div);
-                UI_DrawLineBuffer(gFrameBuffer, 20, (int16_t)((row) * 8 + 8), 127, (int16_t)((row) * 8 + 8), 1);
+                UI_DrawLineBuffer(gFrameBuffer, 20, (int16_t)((row) * 8), 127, (int16_t)((row) * 8), 1);
             } else {
                 PrintSmallAt(row + 1, 20, car->name);   /* wireframe: name only */
             }
@@ -1098,7 +1104,8 @@ static void RenderList(void)
             PrintSmallAt(row + 1, 20, car->name);
         }
         if (CarLocked(car))
-            UI_DrawLineBuffer(gFrameBuffer, 20, (int16_t)((row + 1) * 8 + 8), 127, (int16_t)((row + 1) * 8 + 8), 1);
+            /* UI_DrawLineBuffer y is content-relative (0 = LCD row 8) */
+            UI_DrawLineBuffer(gFrameBuffer, 20, (int16_t)((row + 1) * 8), 127, (int16_t)((row + 1) * 8), 1);
     }
 
     snprintf(line, sizeof(line), "%u cars · * lock", (unsigned)count);

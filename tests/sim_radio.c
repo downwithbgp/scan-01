@@ -1,0 +1,319 @@
+/* Scan 01 — the headless radio (the "screenshot without hardware")
+ *
+ * Copyright 2026 Vadim Petrov
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Drives the REAL Scan 01 UI (scan01_ui.c + key layer + pack + fonts +
+ * ui/helper.c) through scripted key sequences against the stubbed radio,
+ * then: (1) asserts the pixel budgets that the (hw) screenshot gate was
+ * going to check, (2) dumps every screen as P4 PBM into ./screenshots/
+ * and prints an ASCII preview. CI turns the PBMs into PNG artifacts.
+ */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "app/fm.h"
+#include "driver/st7565.h"
+#include "font_racing.h"
+#include "scan01_edit.h"
+#include "misc.h"
+#include "radio.h"
+#include "scan01_keys.h"
+#include "scan01_ui.h"
+#include "settings.h"
+#include "settings_pack.h"
+
+extern uint8_t g_sim_screen[8][128];
+void SIM_EEPROM_Reset(void);
+void SIM_EEPROM_Poke(uint16_t address, const void *data, uint16_t size);
+void SIM_EEPROM_SetReadOnly(bool readonly);
+
+static int g_checks = 0;
+static int g_failures = 0;
+
+static void expect(bool cond, const char *what)
+{
+    g_checks++;
+    if (!cond) {
+        g_failures++;
+        printf("FAIL: %s\n", what);
+    }
+}
+
+static void key(KEY_Code_t k) { SCAN01_UI_ProcessKeys(k, true, false); }
+static void release(KEY_Code_t k) { SCAN01_UI_ProcessKeys(k, false, false); }
+static void held(KEY_Code_t k) { SCAN01_UI_ProcessKeys(k, true, true); }
+
+static void ticks(int n)
+{
+    for (int i = 0; i < n; i++)
+        SCAN01_UI_Tick10ms();
+}
+
+static void ptt_tap(void) { key(KEY_PTT); release(KEY_PTT); }
+static void ptt_hold(void) { key(KEY_PTT); ticks(80); release(KEY_PTT); }
+
+static void digit(char d) { key(KEY_0 + (d - '0')); }
+
+static void render(void) { UI_DisplayScan01(); }
+
+/* ---- assertions on the captured screen ---- */
+
+static int line_has_ink(int row, int x0, int x1)   /* row 0..7, pixel columns */
+{
+    for (int x = x0; x <= x1; x++)
+        if (g_sim_screen[row][x] != 0)
+            return 1;
+    return 0;
+}
+
+static void assert_row_empty(int strip, const char *what)
+{
+    expect(!line_has_ink(strip, 0, 127), what);   /* strip 7 = LCD rows 56-63 */
+}
+
+/* the 32 px number zone is right-aligned: for a width W the ink on the
+ * number's top strip starts at >= 127-W. top_row = the FIRST LCD pixel row
+ * of the zone (render line N = LCD rows 8*(N+1)..8*(N+1)+7). */
+static void assert_right_aligned(const char *text, int top_row, const char *what)
+{
+    int w = RACING_TextWidth(text);
+    int left = 127 - w;
+    int strip = top_row / 8;
+    /* nothing left of the number's start on its TOP strip (line 0 of the
+     * zone holds only the number — the name/team live on the lower strips) */
+    expect(!line_has_ink(strip, 0, left - 1), what);
+    expect(line_has_ink(strip, left, 127), what);
+}
+
+/* ---- the demo+ pack: 8 cars (2 at venue 1) on top of the demo stations ---- */
+
+static void pack_car(const char *num, const char *name, const char *team,
+                     uint8_t venue, bool favorite)
+{
+    PackCar_t c;
+    memset(&c, 0, sizeof(c));
+    strncpy(c.number, num, 3);
+    strncpy(c.name, name, 10);
+    strncpy(c.team, team, 6);
+    c.freq_hz = 450000000u + (uint32_t)(num[0] * 1000u);
+    c.narrow = true;
+    c.venue = venue;
+    c.favorite = favorite;
+    if (!PACK_AddCapture(&c))
+        printf("sim: pack_car %s failed\n", num);
+}
+
+static void boot_radio(void)
+{
+    SIM_EEPROM_Reset();
+    PACK_Init();
+    SCAN01_UI_Init();
+    gEEPROM_RSSI_CALIB[0][0] = 100;         /* make the RSSI bar show */
+    gEEPROM_RSSI_CALIB[0][3] = 500;
+    gEeprom.VOLUME_GAIN = 12;
+    gEeprom.VOLUME_GAIN_BACKUP = 12;
+}
+
+/* ---- PBM dump + ASCII preview ---- */
+
+static void dump(const char *name)
+{
+    char path[64];
+    FILE *f;
+
+    system("mkdir -p screenshots");
+
+    snprintf(path, sizeof(path), "screenshots/%s.pbm", name);
+    f = fopen(path, "wb");
+    if (f == NULL) {
+        printf("sim: cannot write %s\n", path);
+        return;
+    }
+    fprintf(f, "P4\n128 64\n");
+    for (int row = 0; row < 64; row++) {
+        uint8_t bytes[16] = { 0 };          /* PBM rows must start clean */
+        for (int x = 0; x < 128; x++) {
+            uint8_t bit = (g_sim_screen[row / 8][x] >> (row % 8)) & 1;
+            if (bit)
+                bytes[x / 8] |= (uint8_t)(0x80 >> (x % 8));
+        }
+        fwrite(bytes, 1, 16, f);
+    }
+    fclose(f);
+}
+
+static void preview(const char *name)
+{
+    printf("=== %s ===\n", name);
+    for (int row = 0; row < 64; row++) {
+        for (int x = 0; x < 128; x++)
+            putchar((g_sim_screen[row / 8][x] >> (row % 8)) & 1 ? '#' : '.');
+        putchar('\n');
+    }
+}
+
+static void shot(const char *name, bool show_preview)
+{
+    render();
+    dump(name);
+    if (show_preview)
+        preview(name);
+}
+
+/* ---- scenarios ---- */
+
+int main(void)
+{
+    char num[8];
+
+    /* 1. boot identity */
+    boot_radio();
+    shot("01-identity", true);
+    assert_row_empty(7, "identity: last line empty");
+    expect(line_has_ink(2, 30, 100) || line_has_ink(3, 30, 100),
+           "identity: the pack line renders");
+
+    /* 2. SCAN on a car (identity expires → the tick starts the scan) */
+    pack_car("24", "BYRON W", "HMS", 0, true);
+    pack_car("29A", "HAMILTON L", "MCL", 1, false);
+    pack_car("8", "KYLE B", "TRD", 0, true);
+    pack_car("100", "ANDRETTI M", "CGR", 0, false);
+    pack_car("3", "DILLON A", "RCR", 1, false);
+    pack_car("48", "JOHNSON J", "HMS", 0, false);
+    pack_car("19", "TRUEX M", "JGR", 0, false);
+    pack_car("12", "BLANEY R", "PEN", 0, false);
+    PACK_SetMyDriver("24");
+    SCAN01_UI_Init();                       /* re-init after the pack grew */
+    ticks(80);                              /* identity expires */
+    ticks(1);                               /* the scan self-heals */
+    shot("02-scan-car", true);
+    strncpy(num, "24", sizeof(num));
+    assert_right_aligned("24", 8, "scan: number zone right-aligned");
+
+    /* 3. SCAN on a station (poke the current channel — a screenshot tool) */
+    gRxVfo->CHANNEL_SAVE = 8;               /* first station channel */
+    shot("03-scan-station", true);
+
+    /* 4. HOLD */
+    gRxVfo->CHANNEL_SAVE = 0;
+    ptt_tap();
+    shot("04-hold", true);
+    assert_row_empty(7, "hold: last line empty");
+
+    /* 5. LIST with the selection on car 0 (* = the printed SCAN label) */
+    key(KEY_STAR);
+    key(KEY_UP);
+    shot("05-list", true);
+    {
+        int inv = 0;
+        for (int x = 0; x < 128; x++)
+            if (g_sim_screen[1][x] == 0xFF)     /* line 0: only the number punches out */
+                inv++;
+        expect(inv > 100, "list: selected row is inverted");
+    }
+    {
+        int clean = 1;
+        for (int row = 4; row <= 5; row++)      /* lines 3-4: text + rules, no blocks */
+            for (int x = 0; x < 128; x++)
+                if (g_sim_screen[row][x] == 0xFF)
+                    clean = 0;
+        expect(clean, "list: unselected rows are not inverted");
+    }
+
+    /* 6. lockout on car 0, then move to car 1: the window [0,1,2] shows
+     * the locked car's strike (block 0) and the venue rule (block 1) */
+    held(KEY_STAR);
+    key(KEY_DOWN);
+    shot("06-list-lockout-divider", true);
+    {
+        int strike = 0, rule = 0;
+        for (int x = 20; x < 127; x++) {
+            if (g_sim_screen[2][x] & 0x01)     /* strike: content y=8 of block 0 */
+                strike = 1;
+            if (g_sim_screen[3][x] & 0x01)     /* rule: content y=16 of block 1 */
+                rule = 1;
+        }
+        expect(strike, "list: locked car struck through");
+        expect(rule, "list: venue divider rule visible");
+    }
+
+    /* 7. CAPTURE empty */
+    key(KEY_STAR);                          /* back to SCAN */
+    ptt_hold();
+    shot("07-capture-empty", true);
+
+    /* 8. CAPTURE typed */
+    digit('2');
+    digit('4');
+    shot("08-capture-24", true);
+    assert_right_aligned("24", 24, "capture: number input right-aligned");
+
+    /* 9. BRD (three EXITs leave CAPTURE: delete, delete, cancel) */
+    key(KEY_EXIT);
+    key(KEY_EXIT);
+    key(KEY_EXIT);
+    held(KEY_0);
+    shot("09-brd", true);
+    expect(gFmRadioMode, "brd: FM mode active");
+
+    /* 10. WX (from BRD — the FM teardown must have run) */
+    held(KEY_5);
+    shot("10-wx", true);
+    expect(!gFmRadioMode, "wx from brd: FM torn down");
+    expect(line_has_ink(7, 0, 127), "wx: hint line");
+    key(KEY_DOWN);
+    shot("11-wx-2", true);
+
+    /* 11. SETUP pages */
+    key(KEY_STAR);
+    key(KEY_MENU);
+    shot("12-setup-pack", true);
+    key(KEY_MENU);
+    shot("13-setup-audio", true);
+    key(KEY_MENU);
+    shot("14-setup-display", true);
+    key(KEY_MENU);
+    shot("15-setup-info", true);
+    key(KEY_EXIT);                          /* leave SETUP */
+
+    /* 12. the name editor: LIST → M on car 0 → type BYRON */
+    ticks(80);
+    key(KEY_UP);
+    key(KEY_MENU);
+    shot("16-edit-empty", true);
+    digit('2'); digit('2');                 /* B */
+    digit('9'); digit('9'); digit('9');     /* Y */
+    digit('7'); digit('7'); digit('7');     /* R */
+    digit('6'); digit('6'); digit('6');     /* O */
+    ticks(160);                             /* the multi-tap window expires */
+    digit('6'); digit('6');                 /* N */
+    shot("17-edit-byron", true);
+    expect(strcmp(SCAN01_EDIT_GetBuffer(), "BYRON") == 0, "edit: multi-tap types BYRON");
+
+    /* 13. NO PACK boot (a failing EEPROM: even the demo install fails) */
+    SIM_EEPROM_Reset();
+    SIM_EEPROM_SetReadOnly(true);
+    PACK_Init();
+    SCAN01_UI_Init();
+    shot("18-nopack", true);
+    expect(!PACK_IsValid(), "nopack: no valid pack");
+    expect(line_has_ink(2, 30, 100) || line_has_ink(3, 30, 100),
+           "nopack: the NO PACK line renders");
+
+    printf("sim: %d checks, %d failures\n", g_checks, g_failures);
+    return g_failures ? 1 : 0;
+}

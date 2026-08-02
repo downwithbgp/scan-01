@@ -92,6 +92,13 @@ Host tests (band-lock, pack layer):
     $ /tmp/test_keys
     $ gcc -Wall -Werror -Wextra -I. tests/test_edit.c scan01_edit.c -o /tmp/test_edit
     $ /tmp/test_edit
+    $ ./tools/build-sim.sh      # the headless radio: pixel-budget assertions
+    $ python3 tools/pbm2png.py  # screenshots/*.png + index.html
+
+The headless radio (tests/sim_radio.c + tests/sim_stubs.c) drives the REAL
+Scan 01 UI against stubbed hardware and asserts the pixel budgets the
+hardware screenshot gate was going to check — every push produces
+viewable screenshots as a CI artifact (scan01-screenshots).
 
 CI runs these on every push, then builds the firmware and checks the
 flash gate.

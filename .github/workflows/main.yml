@@ -29,6 +29,8 @@ jobs:
         /tmp/test_keys
         gcc -Wall -Werror -Wextra -I. tests/test_edit.c scan01_edit.c -o /tmp/test_edit
         /tmp/test_edit
+        ./tools/build-sim.sh
+        python3 tools/pbm2png.py
 
     - name: Build the scan01 edition
       run: |
@@ -46,3 +48,9 @@ jobs:
       with:
         name: scan01-firmware
         path: scan01.packed.bin
+
+    - name: Upload the headless-radio screenshots
+      uses: actions/upload-artifact@v4
+      with:
+        name: scan01-screenshots
+        path: screenshots/
