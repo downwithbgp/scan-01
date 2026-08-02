@@ -1,71 +1,85 @@
-# The bench rig — validating Scan 01 without a race
+# The bench rig — validating Scan 01 without a race (and without transmitting)
 
-*Status: written 2026-08 (P2 S9); every (bench) gate in the specs refers
-here. The rig needs two radios and, ideally, a signal generator — no track,
-no RF environment required. Everything below is host-verified already
-(`tests/`, the sim, the packtool's golden test); the bench closes the loop
-on the hardware-truth items: timing, audio, and the protocol.*
+*Status: rewritten 2026-08. The project has ONE radio and NO licence to
+transmit. That is fine: receiving is always legal, the racing band
+(450–470 MHz, FCC Part 90) is off-limits even to hams, and the rig below
+never radiates — it either listens to real ambient signals or injects
+conducted test signals straight into the antenna port (standard service-
+monitor practice; nothing intentional radiates, so no licence applies).*
 
-## The setup
+## The setup (what exists)
 
-- **Radio A** — the device under test, running the Scan 01 edition.
-- **Radio B** — a second UV-K5/K6 (any firmware; F4HWN is fine) used as a
-  transmitter, OR a signal generator with CTCSS/DCS capability.
-- **The bench pack** — a pack with known channels: three tone'd cars
-  (CTCSS A/B/C), one DCS car, one CSQ car, one station — built with
-  `packtool build` from `race-packs/library/` entries and flashed via
-  `packtool flash` (the packtool round-trip gate itself).
-- A UART cable to Radio A (the k5prog port) for `packtool dump` and the
+- **The radio** — one UV-K5/K6 running the Scan 01 edition.
+- **The bench pack** — a pack with known channels (three tone'd cars, one
+  DCS car, one CSQ car, one station) built with `packtool build` and
+  flashed via `packtool flash` (that round-trip is itself a gate).
+- **A UART cable** — for `packtool dump`, `pack_status` (0x05DF), and the
   F4HWN screenshot channel.
+- **Ambient signals, free and legal to receive** — Indianapolis has plenty:
+  NOAA 162.550, broadcast FM, the 2 m repeaters (146.94 / 146.76 — Skywarn),
+  and IND aircraft on 118–137 MHz AM. These close the passive gates now.
 
-## The (bench) gates
+## Phase 1 — the passive bench (no money, no licence, do this first)
 
-### 1. Dwell, decode hold, hang (S2)
+Real signals can't be scripted, but they close most of the hardware gates:
 
-Transmit a 300 ms burst on one channel from Radio B. On Radio A, observe
-(UART debug or screenshot timing):
+- **Real-glass screenshots** — every screen, every state, via the F4HWN
+  screenshot channel, reviewed against the sim's pixel budgets.
+- **The receive path** — NOAA in WX, broadcast in BRD, aircraft in
+  PRACTICE (AM), a repeater in SCAN. Audio clean, no clicks.
+- **Capture on real signals** — long-PTT on NOAA, save as a car, reboot,
+  confirm it survives; `packtool dump` round-trip; `pack_status`.
+- **The fan hand-off, part 1** — hand the radio to someone who is not a
+  ham; the passive bench is a real radio with real signals to listen to.
 
-- the walk advances ~80 ms/entry (spec §4.1);
-- the candidate pauses ~200 ms (decode hold) before audio opens;
-- the audio opens without a burst-edge click (unmute debounce, §4.2);
-- after the burst, the audio holds ~250 ms (hang) before the walk resumes;
-- a second burst within the hang window does NOT chop (the no-chop re-land).
+## Phase 2 — the active bench (conducted, no radiation → no licence)
 
-### 2. Tone-lock landing (S3)
+The precise timing gates — dwell, decode hold, tone-lock, hang, FOLLOW,
+the CSQ guard — need a *controlled* RF stimulus. That stimulus goes
+**through a coax cable and an attenuator into the antenna port**; nothing
+is radiated, so no licence is required. Two tooling options:
 
-- With Radio B transmitting **tone A** on channel A's frequency: Radio A
-  opens audio (tone match).
-- Switch Radio B to **tone B** on the same frequency: Radio A must NOT
-  open audio — the foreign tone skips the entry and the walk moves on.
-- CSQ channel: audio opens on carrier alone.
-- Open-mic case: hold Radio B's carrier on the CSQ channel > 5 s —
-  Radio A skips it for one cycle (the CSQ guard, §5).
+- **A signal generator** (or a borrowed service monitor — the classic
+  tool) with CTCSS/DCS capability: the professional answer.
+- **An SDR with a TX output** (HackRF One class, ~$300) at −20 dBm
+  through 40–50 dB of attenuation → −60 dBm at the radio: fully
+  software-defined CTCSS/DCS/modulation on exactly 450.000–470.000 MHz.
+  It doubles as a spectrum analyzer for the grandstand-desense study.
 
-### 3. FOLLOW (S4)
+The measurements (docs referenced in the S-records):
 
-Set my-driver to car 24 in the bench pack. While the walk runs, transmit
-a single 200 ms burst on car 24's channel at a random moment. Measure the
-gap until Radio A lands on it — must be ≤ 8 × 80 ms + the decode hold
-(≤ ~840 ms worst case).
+1. **Dwell / decode hold / hang (S2):** scripted 300 ms bursts — the walk
+   advances ~80 ms/entry; the candidate pauses ~200 ms; audio opens
+   without a burst-edge click; the carrier drop holds ~250 ms; a second
+   burst within the hang does not chop.
+2. **Tone-lock (S3):** tone A opens audio on channel A; switching the
+   generator to tone B on the same frequency must NOT open audio — the
+   foreign tone skips the entry. CSQ opens on carrier alone; > 5 s of
+   continuous carrier on the CSQ channel triggers the guard skip.
+3. **FOLLOW (S4):** with my-driver set, a scripted 200 ms burst on the
+   priority channel must land within ≤ 8 × 80 ms + the decode hold
+   (≤ ~840 ms worst case).
 
-### 4. The protocol round-trip (T9/T8)
+## Phase 3 — the licenced option (optional, 2 m / 70 cm only)
 
-- `packtool dump --port` on Radio A → `pack.json`; `packtool validate`;
-  `packtool build` → a patch; `packtool diff` against the original.
-- The **capture → reboot → present** flow: long-PTT capture a car, power
-  cycle, confirm the entry survives in the LIST and the dump.
-- `pack_status` over UART (0x05DF) reports the pack + captured entries.
+A licenced amateur friend can legally transmit on 2 m (144–148 MHz) and
+70 cm (420–450 MHz — their licence covers those bands, NOT 450–470).
+The K5/K6 front end covers 400–470 MHz, so tone-lock behavior at
+440.000 MHz is representative of the racing band. Useful for audio-
+quality and tone tests when no generator is at hand. Never use this
+path on 450–470 MHz — Part 90, no amateur allocation.
 
-### 5. The fan hand-off (P1 acceptance)
+## Phase 4 — the track (the final validator)
 
-The ultimate gate: hand the radio to someone who is not a ham and does not
-know the project. They must be able to: turn it on, hear the race,
+Intermod and desense in a packed grandstand, weak-car landing against
+real noise, the final dwell value, and the ergonomics — only the track
+can answer (P0: IRP Saturday nights, Indy 500 May 2026). The sim's
+scenarios are the rehearsal; the track is the performance.
+
+## The fan hand-off (P1 acceptance)
+
+The ultimate gate: hand the radio to someone who is not a ham and does
+not know the project. They must be able to: turn it on, hear the race,
 hold a car, type a number, catch and save a frequency, find the weather,
-and not get lost. The sim's scenarios are the rehearsal; the hand-off is
-the performance.
-
-## What the bench cannot test
-
-Intermod and desense in a packed grandstand, weak-car landing against real
-noise, the final dwell value, and the physical ergonomics — those need the
-track (P0: IRP Saturday nights, Indy 500 May 2026).
+and not get lost. Part 1 happens on the passive bench; the full
+performance happens at the track.

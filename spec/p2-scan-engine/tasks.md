@@ -26,8 +26,8 @@ lockout bitmap) being in place.
       fixed carrier-drop + hang replaces it (the UI no longer calls
       CHFRSCANNER_Start/Stop).
 - **Gate (PASS):** host tests pin the timing (dwell boundaries, decode hold,
-      hang, no-chop re-land); the sim walks real dwells. **(bench)** UART dwell
-      timing on two radios remains pending.
+      hang, no-chop re-land); the sim walks real dwells. **(bench)** UART dwell timing via a conducted signal generator
+      (docs/bench-rig.md Phase 2) remains pending.
 
 ## S3. Landing & tone gate — DONE (hw bench pending)
 - [x] Candidate = BK4819 squelch-open (`g_SquelchLost` — true = open); the engine's
@@ -36,7 +36,8 @@ lockout bitmap) being in place.
       engine's tick); foreign tones skip the entry.
 - [x] CSQ entries land on carrier-only (the CSQ hang guard caps the open-mic risk, S5).
 - **Gate (PASS):** host tests cover the gate paths; the sim lands a tone'd signal
-      end to end. **(bench)** two-radio audio test remains pending.
+      end to end. **(bench)** audio test via a conducted signal generator
+      (docs/bench-rig.md Phase 2) remains pending.
 ## S4. FOLLOW mode (v1) — DONE
 - [x] The my-driver car is always in the walk (even outside the group filter) and is
       revisited every 8 entries (`SCAN_FOLLOW_INTERLEAVE`), worst-case silence
@@ -70,5 +71,6 @@ lockout bitmap) being in place.
 ## S9. Spec sync — DONE (bench-rig doc pending)
 - [x] This file records the actuals; the spec's constants and the seam table are
       current (the engine bypasses CHFRSCANNER; the base's HandleIncoming tone
-      gate stays wired). `docs/bench-rig.md` is written (2026-08); its (bench)
-      gates wait for two radios.
+      gate stays wired). `docs/bench-rig.md` (2026-08) plans the (bench) gates around ONE radio
+      and no licence: passive tests on real ambient signals + conducted
+      generator tests (no radiation — no licence applies).
