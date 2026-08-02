@@ -5,9 +5,16 @@ on:
     branches: [ main ]
   pull_request:
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
 
     steps:
     - name: Checkout code
@@ -62,3 +69,20 @@ jobs:
       with:
         name: scan01-screenshots
         path: screenshots/
+
+    - name: Publish the rolling user-testing release
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        if ! gh release view user-testing >/dev/null 2>&1; then
+          gh release create user-testing --prerelease \
+            --title "User testing build" \
+            --notes "Rolling build of \`main\` for testers — see the user testing guide (docs/user-testing.md)." \
+            --target "$GITHUB_SHA"
+        else
+          git push --force origin "$GITHUB_SHA:refs/tags/user-testing"
+          gh release edit user-testing \
+            --notes "Rolling build of \`main\` @ \`$GITHUB_SHA\` — see the user testing guide (docs/user-testing.md)."
+        fi
+        gh release upload user-testing scan01.packed.bin --clobber

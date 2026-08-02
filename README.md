@@ -132,9 +132,9 @@ flash gate.
 
 ### Why shouldn't I use Scan 01 yet?
 
-* There are no releases and no stable binary — the CI `scan01-firmware`
-  artifact (or a local build) is the current one; testers: see the
-  [user testing guide](docs/user-testing.md).
+* There are no stable releases yet — a rolling **user-testing**
+  pre-release carries the latest build (rebuilt on every push); testers:
+  see the [user testing guide](docs/user-testing.md).
 * No hardware validation yet: the (hw) gates — real-glass screenshots,
   the dump/flash round-trip, the bench tests (docs/bench-rig.md), and the fan
   hand-off — need a radio in a hand. Everything is host-verified;

@@ -18,9 +18,10 @@ break the radio.
   jack (the same cable CHIRP uses).
 - A computer: Windows for flashing (the flasher GUI is Windows-only);
   the optional pack step needs Python 3.
-- The firmware binary `scan01.packed.bin` — grab it from the latest CI
-  run (GitHub → Actions → *Build Scan 01* → the `scan01-firmware`
-  artifact), or build it yourself (README, "Building").
+- The firmware binary `scan01.packed.bin` — from the **user-testing**
+  release: <https://github.com/downwithbgp/scan-01/releases/tag/user-testing>
+  (a rolling pre-release, rebuilt on every push to main). Or build it
+  yourself (README, "Building").
 
 ## Step 1 — Install the firmware (~5 min)
 
