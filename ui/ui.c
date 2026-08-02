@@ -52,8 +52,8 @@ bool              gAskToDelete;
 
 
 void (*UI_DisplayFunctions[])(void) = {
-    [DISPLAY_MAIN] = &UI_DisplayMain,
 #ifdef ENABLE_FEAT_SCAN01
+    [DISPLAY_MAIN] = &UI_DisplayScan01,
     [DISPLAY_SCAN01] = &UI_DisplayScan01,
     [DISPLAY_MENU] = &UI_DisplayScan01,     /* never selected; no NULL hole */
 #else

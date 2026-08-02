@@ -65,10 +65,16 @@ typedef enum {
     SCAN01_ACT_GROUP,       /* F2 short: cycle scan group */
     SCAN01_ACT_SETUP,       /* M short */
     SCAN01_ACT_KEYLOCK,     /* M long */
-    SCAN01_ACT_BACK,        /* EXIT/PTT/M short in SETUP; EXIT in sub-states */
+    SCAN01_ACT_BACK,        /* EXIT/PTT short in SETUP; EXIT in sub-states */
+    SCAN01_ACT_SETUP_NEXT,  /* M short in SETUP: next page (vision §5.5) */
     SCAN01_ACT_LIST,        /* UP/DOWN in SCAN: open the LIST */
     SCAN01_ACT_NAV_UP,      /* UP (LIST scroll, HOLD prev car, SETUP value) */
     SCAN01_ACT_NAV_DOWN,    /* DOWN */
+    SCAN01_ACT_VOL_UP,      /* held UP in listening states — the volume control
+                               (stock K5/K6 has no knob; v2 hardware restores it) */
+    SCAN01_ACT_VOL_DOWN,    /* held DOWN */
+    SCAN01_ACT_VALUE_UP,    /* held UP in SETUP: edit the focused value (repeats) */
+    SCAN01_ACT_VALUE_DOWN,  /* held DOWN in SETUP */
 
     /* typing (vision §4.3) */
     SCAN01_ACT_TYPE_UPDATE, /* buffer changed — redraw the big digits */

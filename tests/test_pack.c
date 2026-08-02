@@ -321,6 +321,35 @@ int main(void)
     memcpy(meta, g_eeprom + 0x1D10, 10);
     expect(meta[8] == 0x00 && meta[9] == 0x07, "station 0 tone/kind bits");
 
+    /* ---- T6b: seal setter + rename ---- */
+    eeprom_reset();
+    expect(PACK_Init(), "seal: init");
+    {
+        uint8_t hdr[0x40];
+        memcpy(hdr, g_eeprom + 0x1BD0, 0x40);
+        expect((hdr[0x39] & 0x01) == 0, "seal: starts unsealed");
+        expect(PACK_SetSealed(true), "seal: set");
+        expect(PACK_IsSealed(), "seal: is sealed");
+        memcpy(hdr, g_eeprom + 0x1BD0, 0x40);
+        expect((hdr[0x39] & 0x01) != 0, "seal: flags byte persisted");
+        PackCar_t blocked = make_car("77", "B", "H", 451112500u, 20, PACK_CT_CTCSS);
+        expect(!PACK_AddCapture(&blocked), "seal: capture refused");
+        expect(PACK_CarCount() == 0, "seal: nothing added");
+        expect(PACK_SetSealed(false), "seal: clear");
+        expect(!PACK_IsSealed(), "seal: cleared");
+        expect(PACK_AddCapture(&blocked), "seal: capture works again");
+        expect(PACK_CarCount() == 1, "seal: capture added after unseal");
+    }
+    expect(PACK_GetCar(0) != NULL, "rename: a car exists");
+    expect(PACK_RenameCar(0, "HAMILTON L"), "rename: ok");
+    expect(strcmp(PACK_GetCar(0)->name, "HAMILTON L") == 0, "rename: ram updated");
+    expect(memcmp(g_eeprom + 0x0F50, "HAMILTON L", 10) == 0, "rename: eeprom names region");
+    expect(PACK_SetSealed(true), "rename: seal");
+    expect(!PACK_RenameCar(0, "WRONG"), "rename: refused when sealed");
+    expect(PACK_SetSealed(false), "rename: unseal");
+    expect(!PACK_RenameCar(99, "X"), "rename: bad index refused");
+    expect(!PACK_RenameCar(0, NULL), "rename: NULL refused");
+
     printf("pack layer: %d checks, %d failures\n", g_checks, g_failures);
     return g_failures == 0 ? 0 : 1;
 }

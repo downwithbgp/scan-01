@@ -323,8 +323,14 @@ static Scan01Action_t HandleListeningKey(KEY_Code_t key, bool held)
 
     /* ---- held events ---- */
     if (held) {
-        if (g_ui_state == SCAN01_UI_SETUP)
+        if (g_ui_state == SCAN01_UI_SETUP) {
+            /* held ▲▼ edits the focused value (vision §5.5: UP/DOWN + knob edit) */
+            if (key == KEY_UP)
+                return SCAN01_ACT_VALUE_UP;
+            if (key == KEY_DOWN)
+                return SCAN01_ACT_VALUE_DOWN;
             return (key == KEY_EXIT) ? SCAN01_ACT_HOME : SCAN01_ACT_NONE;
+        }
         if (typing) {
             switch (key) {
             case KEY_0:
@@ -353,8 +359,12 @@ static Scan01Action_t HandleListeningKey(KEY_Code_t key, bool held)
         case KEY_EXIT:  return SCAN01_ACT_HOME;
         case KEY_MENU:  return SCAN01_ACT_KEYLOCK;
         case KEY_SIDE1:    return SCAN01_ACT_MUTE_TOGGLE;
-        case KEY_UP:    return SCAN01_ACT_NAV_UP;    /* repeats scroll fast */
-        case KEY_DOWN:  return SCAN01_ACT_NAV_DOWN;
+        case KEY_UP:
+            return (g_ui_state == SCAN01_UI_LIST) ? SCAN01_ACT_NAV_UP
+                                                  : SCAN01_ACT_VOL_UP; /* held = volume */
+        case KEY_DOWN:
+            return (g_ui_state == SCAN01_UI_LIST) ? SCAN01_ACT_NAV_DOWN
+                                                  : SCAN01_ACT_VOL_DOWN;
         default:        return SCAN01_ACT_NONE;
         }
     }
@@ -385,10 +395,12 @@ static Scan01Action_t HandleListeningKey(KEY_Code_t key, bool held)
     }
 
     if (g_ui_state == SCAN01_UI_SETUP) {
-        /* SETUP is a form: only nav, back, and * escape (vision §4.2) */
+        /* SETUP is a form: M = next page (§5.5), EXIT/PTT leave, * escapes */
         switch (key) {
-        case KEY_EXIT:
         case KEY_MENU:
+            return SCAN01_ACT_SETUP_NEXT;
+        case KEY_EXIT:
+        case KEY_PTT:
             return SCAN01_ACT_BACK;
         case KEY_STAR:
             return SCAN01_ACT_SCAN;

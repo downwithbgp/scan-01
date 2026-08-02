@@ -547,6 +547,29 @@ void PACK_SetPractice(bool practice)
 }
 bool PACK_IsPractice(void)  { return g_practice; }
 
+bool PACK_SetSealed(bool sealed)
+{
+    if (g_sealed == sealed)
+        return true;
+    g_sealed = sealed;
+    if (!g_practice)
+        header_commit();                    /* the flags byte is inside the CRC */
+    return true;
+}
+
+bool PACK_RenameCar(uint8_t car_index, const char *name)
+{
+    if (!g_valid || car_index >= PACK_CarCount() || name == NULL)
+        return false;
+    if (g_sealed)
+        return false;                        /* "SEALED" status — pack data is safe */
+    strncpy(g_cars[car_index].name, name, 10);
+    g_cars[car_index].name[10] = 0;
+    if (!g_practice)
+        name_team_write(car_index, g_cars[car_index].name, g_cars[car_index].team);
+    return true;
+}
+
 uint8_t PACK_CarCount(void)     { return g_car_count; }
 uint8_t PACK_StationCount(void) { return g_station_count; }
 

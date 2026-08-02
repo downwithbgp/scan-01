@@ -18,7 +18,9 @@
 #include <string.h>
 
 #include "app/chFrScanner.h"
+#include "app/fm.h"
 #include "driver/bk4819.h"
+#include "driver/eeprom.h"
 #include "driver/st7565.h"
 #include "external/printf/printf.h"
 #include "font_racing.h"
@@ -26,11 +28,13 @@
 #include "misc.h"
 #include "pack_bandlock.h"
 #include "radio.h"
+#include "scan01_edit.h"
 #include "scan01_keys.h"
 #include "settings.h"
 #include "settings_pack.h"
 #include "ui/helper.h"
 #include "ui/status.h"
+#include "helper/battery.h"
 
 /* ---- internal states (a subset of the key layer's; BRD/WX/SETUP = T6b) ---- */
 typedef enum {
@@ -38,6 +42,10 @@ typedef enum {
     S1_ST_HOLD,
     S1_ST_LIST,
     S1_ST_CAPTURE,
+    S1_ST_BRD,
+    S1_ST_WX,
+    S1_ST_SETUP,
+    S1_ST_EDIT,
 } S1State_t;
 
 static S1State_t g_st = S1_ST_SCAN;
@@ -47,10 +55,18 @@ static char      g_flash[15];         /* transient state-line message */
 static uint16_t  g_flash_10ms;
 static bool      g_identity;          /* boot identity / NO PACK screen (vision §5.8) */
 static uint16_t  g_identity_10ms;
+static uint8_t   g_wx_channel;        /* NOAA channel 0-6 (WX state) */
+static uint16_t  g_mute_10ms;         /* F1 short: mute countdown */
+static uint8_t   g_mute_seconds;      /* the F1 mute duration (SETUP Audio) */
+static uint8_t   g_setup_page;        /* SETUP 0-3: Pack / Audio / Display / Info */
+static uint8_t   g_setup_focus;       /* the focused row on the page */
 
 /* ---- 8 px state glyphs (◉ ◼ ▸) — hand-drawn, column-major ---- */
 static const uint8_t GLYPH_SCAN[8] = { 0x3C, 0x42, 0x99, 0xA5, 0xA5, 0x99, 0x42, 0x3C };
 static const uint8_t GLYPH_HOLD[8] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
+
+static void PrintSmall(uint8_t line, const char *text, bool center);
+static void PrintSmallAt(uint8_t line, uint8_t x, const char *text);
 
 static const char *const KIND_TEXT[8] = {
     "BROADCAST", "CONTROL", "PA", "OFFICIALS", "SAFETY", "RADIO", "MEDIA", "OTHER"
@@ -74,6 +90,10 @@ static void SetState(S1State_t st)
     case S1_ST_LIST:    SCAN01_KEYS_SetUiState(SCAN01_UI_LIST); break;
     case S1_ST_CAPTURE: SCAN01_KEYS_SetUiState(SCAN01_UI_CAPTURE);
                         SCAN01_TYPE_SetAutoCommit(false); break;  /* §4.5: no timeout in the form */
+    case S1_ST_BRD:     SCAN01_KEYS_SetUiState(SCAN01_UI_BRD); break;
+    case S1_ST_WX:      SCAN01_KEYS_SetUiState(SCAN01_UI_WX); break;
+    case S1_ST_SETUP:   SCAN01_KEYS_SetUiState(SCAN01_UI_SETUP); break;
+    case S1_ST_EDIT:    SCAN01_KEYS_SetUiState(SCAN01_UI_LIST); break; /* key layer stays LIST */
     }
     gUpdateDisplay = true;
 }
@@ -209,6 +229,133 @@ static void TuneCar(const PackCar_t *car)
 {
     TuneChannel(car->channel);
     SetState(S1_ST_HOLD);
+}
+
+/* ---- volume + mute (vision §4.1: the volume control; stock K5/K6 has no
+ * knob — held ▲/▼ is the gesture, SETUP has a slider; v2 restores the knob) ---- */
+
+static void ApplyVolume(void)
+{
+    if (gEeprom.VOLUME_GAIN > 15)
+        gEeprom.VOLUME_GAIN = 15;
+    BK4819_WriteRegister(BK4819_REG_48,
+        (11u << 12) | (0u << 10) | (gEeprom.VOLUME_GAIN << 4) | (gEeprom.DAC_GAIN << 0));
+    gUpdateStatus = true;
+}
+
+static void MuteOn(void)
+{
+    gMute = true;
+    gEeprom.VOLUME_GAIN = 0;
+    ApplyVolume();
+}
+
+static void MuteOff(void)
+{
+    gMute = false;
+    gEeprom.VOLUME_GAIN = gEeprom.VOLUME_GAIN_BACKUP;
+    ApplyVolume();
+}
+
+static void VolumeChange(int8_t delta)
+{
+    if (gMute)
+        MuteOff();                          /* first nudge unmutes */
+    int8_t v = (int8_t)gEeprom.VOLUME_GAIN + delta;
+    if (v < 0)
+        v = 0;
+    if (v > 15)
+        v = 15;
+    gEeprom.VOLUME_GAIN = (uint8_t)v;
+    gEeprom.VOLUME_GAIN_BACKUP = gEeprom.VOLUME_GAIN;
+    ApplyVolume();
+    SETTINGS_SaveSettings();                /* the power knob cuts power — persist now */
+}
+
+/* ---- BRD (broadcast radio, vision §5.10) ---- */
+
+static uint8_t BrdPresetCount(void)
+{
+    uint8_t n = 0;
+    for (uint8_t i = 0; i < PACK_StationCount(); i++)
+        if (PACK_GetStation(i)->kind == PACK_KIND_BROADCAST)
+            n++;
+    return n;
+}
+
+static const PackStation_t *BrdPreset(uint8_t index)
+{
+    uint8_t n = 0;
+    for (uint8_t i = 0; i < PACK_StationCount(); i++)
+        if (PACK_GetStation(i)->kind == PACK_KIND_BROADCAST) {
+            if (n == index)
+                return PACK_GetStation(i);
+            n++;
+        }
+    return NULL;
+}
+
+static void EnterBrd(void)
+{
+    uint8_t count = BrdPresetCount();
+    CHFRSCANNER_Stop();
+    FM_Start();
+    if (count > 0) {
+        const PackStation_t *st = BrdPreset(0);
+        FM_Tune((uint16_t)(st->freq_hz / 100000u), 0, true);
+    } else {
+        FM_Tune(1011, 0, true);             /* 101.1 — a default that always exists */
+        Flash("NO PRESETS");
+    }
+    SetState(S1_ST_BRD);
+}
+
+static void BrdTeardown(void)
+{
+    if (gFmRadioMode)
+        FM_TurnOff();                       /* every BRD exit must clear the FM path */
+}
+
+static void ExitBrd(void)
+{
+    BrdTeardown();
+    StartScan();                            /* RADIO_SelectVfos re-arms the RX audio path */
+}
+
+static void BrdWalk(int8_t delta)
+{
+    uint8_t count = BrdPresetCount();
+    if (count == 0) {
+        Flash("NO PRESETS");
+        return;
+    }
+    uint8_t cur = 0;
+    uint32_t cur_hz = (uint32_t)gEeprom.FM_FrequencyPlaying * 100000u;
+    for (uint8_t i = 0; i < count; i++)
+        if (BrdPreset(i)->freq_hz == cur_hz) {
+            cur = i;
+            break;
+        }
+    cur = (uint8_t)((cur + count + delta) % count);
+    FM_Tune((uint16_t)(BrdPreset(cur)->freq_hz / 100000u), 0, true);
+    gUpdateDisplay = true;
+}
+
+/* ---- WX (weather, vision §5.10) ---- */
+
+static void EnterWx(void)
+{
+    BrdTeardown();                          /* never enter WX with FM audio routed */
+    CHFRSCANNER_Stop();
+    g_wx_channel = 0;
+    TuneChannel((uint16_t)(NOAA_CHANNEL_FIRST + g_wx_channel));
+    SetState(S1_ST_WX);
+}
+
+static void WxWalk(int8_t delta)
+{
+    g_wx_channel = (uint8_t)((g_wx_channel + 7 + delta) % 7);
+    TuneChannel((uint16_t)(NOAA_CHANNEL_FIRST + g_wx_channel));
 }
 
 /* ---- LIST selection ---- */
@@ -350,6 +497,234 @@ static void HandleCommit(const char *entry)
     TuneCar(car);
 }
 
+/* ---- SETUP (vision §5.5: four boring pages; M = next page, held ▲▼ edits) ---- */
+
+#define SETUP_ROWS 5
+#define SETUP_PAGES 4
+
+static void SetupPersist(void)
+{
+    SETTINGS_SaveSettings();
+}
+
+static void SetupValueChange(int8_t delta)
+{
+    switch (g_setup_page) {
+    case 0:                             /* Pack */
+        if (g_setup_focus == 0) {       /* Mode: RACE/PRACTICE */
+            PACK_SetPractice(!PACK_IsPractice());
+            StartScan();                /* the mode change re-arms the scan */
+        } else if (g_setup_focus == 1) { /* Seal */
+            PACK_SetSealed(!PACK_IsSealed());
+            Flash(PACK_IsSealed() ? "SEALED" : "UNSEALED");
+        } else if (g_setup_focus == 2) { /* My driver: cycle the car numbers */
+            uint8_t count = PACK_CarCount();
+            if (PACK_IsSealed()) {
+                Flash("SEALED");
+            } else if (count > 0) {
+                const char *cur = PACK_MyDriver();
+                for (uint8_t i = 0; i < count; i++) {
+                    uint8_t j = (uint8_t)((i + (delta > 0 ? 1 : count - 1)) % count);
+                    const PackCar_t *c = PACK_GetCar(j);
+                    if (c != NULL && (cur == NULL || cur[0] == 0 || strcmp(cur, c->number) != 0)) {
+                        PACK_SetMyDriver(c->number);
+                        break;
+                    }
+                }
+            } else {
+                Flash("NO CARS");
+            }
+        }
+        break;
+    case 1:                             /* Audio */
+        if (g_setup_focus == 0) {       /* Volume */
+            if (gMute)
+                MuteOff();                  /* never persist a muted 0 */
+            int8_t v = (int8_t)gEeprom.VOLUME_GAIN + delta;
+            if (v < 0) v = 0;
+            if (v > 15) v = 15;
+            gEeprom.VOLUME_GAIN = (uint8_t)v;
+            gEeprom.VOLUME_GAIN_BACKUP = gEeprom.VOLUME_GAIN;
+            ApplyVolume();
+            SetupPersist();
+        } else if (g_setup_focus == 1) { /* Beeps */
+            gEeprom.BEEP_CONTROL = (uint8_t)(!gEeprom.BEEP_CONTROL);
+            SetupPersist();
+        } else if (g_setup_focus == 2) { /* Mute duration: 3/5/10/30 s */
+            static const uint8_t opts[4] = { 3, 5, 10, 30 };
+            for (uint8_t i = 0; i < 4; i++)
+                if (opts[i] == g_mute_seconds) {
+                    g_mute_seconds = opts[(i + 4 + (delta > 0 ? 1 : -1)) % 4];
+                    break;
+                }
+        }
+        break;
+    case 2:                             /* Display */
+        if (g_setup_focus == 0) {       /* Contrast 0-15 */
+            int8_t v = (int8_t)gSetting_set_ctr + delta;
+            if (v < 0) v = 0;
+            if (v > 15) v = 15;
+            gSetting_set_ctr = (uint8_t)v;
+            ST7565_ContrastAndInv();
+            SetupPersist();                 /* SETTINGS_SaveSettings writes 0x1FF0 */
+        } else if (g_setup_focus == 1) { /* Invert */
+            gSetting_set_inv = !gSetting_set_inv;
+            ST7565_ContrastAndInv();
+            SetupPersist();
+        } else if (g_setup_focus == 2) { /* Backlight: OFF/10/30/60/ALWAYS */
+            static const uint8_t opts[5] = { 0, 10, 30, 60, 61 };
+            uint8_t cur = 0;
+            for (uint8_t i = 0; i < 5; i++)
+                if (opts[i] == gEeprom.BACKLIGHT_TIME) {
+                    cur = i;
+                    break;
+                }
+            cur = (uint8_t)((cur + 5 + (delta > 0 ? 1 : -1)) % 5);
+            gEeprom.BACKLIGHT_TIME = opts[cur];
+            SetupPersist();
+        }
+        break;
+    default:
+        break;                          /* Info: nothing to edit */
+    }
+    gUpdateDisplay = true;
+}
+
+static void SetupRenderRow(uint8_t line, const char *label, const char *value, bool focus)
+{
+    char row[24];
+    if (value != NULL && value[0] != 0)
+        snprintf(row, 17, "%s%s", label, value);
+    else
+        strncpy(row, label, 16), row[16] = 0;
+    if (focus) {
+        for (uint8_t x = 0; x < 128; x++)
+            gFrameBuffer[line][x] ^= 0xFF;
+    }
+    PrintSmallAt(line, 0, row);
+}
+
+static void RenderSetup(void)
+{
+    char line[24];
+    char num[8];
+    bool focus = false;
+
+    UI_DisplayStatus();
+    UI_DisplayClear();
+
+    switch (g_setup_page) {
+    case 0:                             /* Pack */
+        PrintSmall(0, "PACK 1/4", false);
+        snprintf(line, sizeof(line), "MODE: %s", PACK_IsPractice() ? "PRACTICE" : "RACE");
+        SetupRenderRow(1, line, NULL, g_setup_focus == 0);
+        snprintf(line, sizeof(line), "SEAL: %s", PACK_IsSealed() ? "ON" : "OFF");
+        SetupRenderRow(2, line, NULL, g_setup_focus == 1);
+        snprintf(line, sizeof(line), "DRIVER: %s", (PACK_MyDriver() != NULL && PACK_MyDriver()[0]) ? PACK_MyDriver() : "-");
+        SetupRenderRow(3, line, NULL, g_setup_focus == 2);
+        snprintf(line, sizeof(line), "%u cars · %u st", (unsigned)PACK_CarCount(), (unsigned)PACK_StationCount());
+        SetupRenderRow(4, line, NULL, false);
+        snprintf(line, sizeof(line), "%s — %s", PACK_Track(), PACK_Session());
+        SetupRenderRow(5, line, NULL, false);
+        break;
+    case 1:                             /* Audio */
+        PrintSmall(0, "AUDIO 2/4", false);
+        snprintf(line, sizeof(line), "VOLUME: %u", (unsigned)gEeprom.VOLUME_GAIN);
+        SetupRenderRow(1, line, NULL, g_setup_focus == 0);
+        snprintf(line, sizeof(line), "BEEPS: %s", gEeprom.BEEP_CONTROL ? "ON" : "OFF");
+        SetupRenderRow(2, line, NULL, g_setup_focus == 1);
+        snprintf(line, sizeof(line), "MUTE: %us", (unsigned)g_mute_seconds);
+        SetupRenderRow(3, line, NULL, g_setup_focus == 2);
+        break;
+    case 2:                             /* Display */
+        PrintSmall(0, "DISPLAY 3/4", false);
+        snprintf(line, sizeof(line), "CONTRAST: %u", (unsigned)gSetting_set_ctr);
+        SetupRenderRow(1, line, NULL, g_setup_focus == 0);
+        snprintf(line, sizeof(line), "INVERT: %s", gSetting_set_inv ? "ON" : "OFF");
+        SetupRenderRow(2, line, NULL, g_setup_focus == 1);
+        snprintf(line, sizeof(line), "LIGHT: %uS", (unsigned)gEeprom.BACKLIGHT_TIME);
+        SetupRenderRow(3, line, NULL, g_setup_focus == 2);
+        break;
+    default:                            /* Info */
+        PrintSmall(0, "INFO 4/4", false);
+        SetupRenderRow(1, "SCAN 01 " VERSION_STRING, NULL, false);
+        snprintf(num, sizeof(num), "%u%%", (unsigned)BATTERY_VoltsToPercent(gBatteryVoltageAverage));
+        snprintf(line, sizeof(line), "BATTERY: %s", num);
+        SetupRenderRow(2, line, NULL, false);
+        snprintf(line, sizeof(line), "PACK: %s", PACK_Track());
+        SetupRenderRow(3, line, NULL, false);
+        break;
+    }
+    PrintSmallAt(6, 0, "hold ▲▼ = edit");
+    ST7565_BlitFullScreen();
+    (void)focus;
+}
+
+/* ---- name editor (multi-tap, vision §4.5) ---- */
+
+static void EnterEdit(void)
+{
+    if (PACK_IsSealed()) {
+        Flash("SEALED");
+        return;                             /* a sealed pack cannot be renamed */
+    }
+    SCAN01_EDIT_Reset();
+    SetState(S1_ST_EDIT);
+}
+
+static void SaveName(void)
+{
+    const char *name = SCAN01_EDIT_GetBuffer();
+    if (name[0] == 0) {
+        Flash("NAME EMPTY");
+        return;
+    }
+    if (PACK_RenameCar((uint8_t)g_list_sel, name)) {
+        Flash("RENAMED");
+    } else {
+        Flash("SEALED");
+    }
+    SetState(S1_ST_LIST);                   /* any save attempt leaves the editor */
+}
+
+static void HandleEditKey(KEY_Code_t key, bool bKeyPressed, bool bKeyHeld)
+{
+    if (key == KEY_PTT && bKeyPressed) {
+        SaveName();
+        return;
+    }
+    if (key == KEY_EXIT && bKeyPressed) {
+        if (bKeyHeld)
+            SCAN01_EDIT_Clear();
+        else
+            SCAN01_EDIT_Delete();
+        gUpdateDisplay = true;
+        return;
+    }
+    if (SCAN01_EDIT_ProcessKey(key))
+        gUpdateDisplay = true;
+}
+
+static void RenderEdit(void)
+{
+    char title[16];
+    const PackCar_t *car = PACK_GetCar((uint8_t)g_list_sel);
+    const char *buf = SCAN01_EDIT_GetBuffer();
+
+    UI_DisplayStatus();
+    UI_DisplayClear();
+
+    if (car != NULL) {
+        snprintf(title, sizeof(title), "RENAME %s", car->number);
+        PrintSmall(0, title, false);
+    }
+    UI_PrintString(buf, 0, 127, 1, 7);      /* the name being built, 16 px */
+    PrintSmall(4, "2=ABC 3=DEF 9=WXYZ", true);
+    PrintSmallAt(5, 0, "PTT = save");
+    PrintSmallAt(6, 0, "EXIT = delete");
+    ST7565_BlitFullScreen();
+}
+
 /* ---- key handling ---- */
 
 void SCAN01_UI_ProcessKeys(KEY_Code_t key, bool bKeyPressed, bool bKeyHeld)
@@ -357,6 +732,11 @@ void SCAN01_UI_ProcessKeys(KEY_Code_t key, bool bKeyPressed, bool bKeyHeld)
     if (g_identity) {
         g_identity = false;                 /* any key skips the boot screen */
         gUpdateDisplay = true;
+    }
+
+    if (g_st == S1_ST_EDIT) {
+        HandleEditKey(key, bKeyPressed, bKeyHeld);   /* the editor owns every key */
+        return;
     }
 
     Scan01Action_t action = SCAN01_KEYS_ProcessKey(key, bKeyPressed, bKeyHeld);
@@ -370,7 +750,11 @@ void SCAN01_UI_ProcessKeys(KEY_Code_t key, bool bKeyPressed, bool bKeyHeld)
             Flash("NO PACK");
         }
         break;
-    case SCAN01_ACT_RESUME:                 /* PTT short in HOLD/LIST */
+    case SCAN01_ACT_RESUME:                 /* PTT short in HOLD/LIST/BRD/WX */
+        if (g_st == S1_ST_BRD) {
+            ExitBrd();
+            break;
+        }
         if (g_st == S1_ST_LIST && g_list_sel == (int16_t)PACK_CarCount()) {
             /* ＋ NEW row is a button: the big button opens it */
             g_capture_freq = gRxVfo->freq_config_RX.Frequency;
@@ -380,7 +764,15 @@ void SCAN01_UI_ProcessKeys(KEY_Code_t key, bool bKeyPressed, bool bKeyHeld)
         }
         break;
     case SCAN01_ACT_CAPTURE:                /* long-PTT: catch it from the air */
-        g_capture_freq = gRxVfo->freq_config_RX.Frequency;
+        if (g_st == S1_ST_BRD) {
+            g_capture_freq = (uint32_t)gEeprom.FM_FrequencyPlaying * 100000u;
+            FM_TurnOff();                   /* the form must be audible: back to the BK4819 */
+        } else if (g_st == S1_ST_WX) {
+            g_capture_freq = NoaaFrequencyTable[g_wx_channel];
+        } else {
+            g_capture_freq = gRxVfo->freq_config_RX.Frequency;
+        }
+        TuneFreq(g_capture_freq);
         SCAN01_TYPE_Reset();
         SetState(S1_ST_CAPTURE);
         break;
@@ -388,10 +780,13 @@ void SCAN01_UI_ProcessKeys(KEY_Code_t key, bool bKeyPressed, bool bKeyHeld)
         SaveCapture();
         break;
     case SCAN01_ACT_SCAN:                   /* * or EXIT back to scanning */
-        if (g_st != S1_ST_SCAN)
+        if (g_st == S1_ST_BRD)
+            ExitBrd();
+        else if (g_st != S1_ST_SCAN)
             StartScan();
         break;
     case SCAN01_ACT_HOME:                   /* long-EXIT: LIST in RACE mode */
+        BrdTeardown();                      /* long-EXIT from BRD must clear the FM path */
         if (PACK_IsValid())
             CHFRSCANNER_Stop();             /* browse is quiet */
         g_list_sel = 0;
@@ -408,12 +803,30 @@ void SCAN01_UI_ProcessKeys(KEY_Code_t key, bool bKeyPressed, bool bKeyHeld)
             ListSelect(-1);
         else if (g_st == S1_ST_HOLD)
             HoldWalk(-1);
+        else if (g_st == S1_ST_BRD)
+            BrdWalk(-1);
+        else if (g_st == S1_ST_WX)
+            WxWalk(-1);
+        else if (g_st == S1_ST_SETUP) {
+            if (g_setup_focus > 0)
+                g_setup_focus--;
+            gUpdateDisplay = true;
+        }
         break;
     case SCAN01_ACT_NAV_DOWN:
         if (g_st == S1_ST_LIST)
             ListSelect(+1);
         else if (g_st == S1_ST_HOLD)
             HoldWalk(+1);
+        else if (g_st == S1_ST_BRD)
+            BrdWalk(+1);
+        else if (g_st == S1_ST_WX)
+            WxWalk(+1);
+        else if (g_st == S1_ST_SETUP) {
+            if (g_setup_focus < SETUP_ROWS - 1)
+                g_setup_focus++;
+            gUpdateDisplay = true;
+        }
         break;
     case SCAN01_ACT_LOCKOUT: {              /* long-* in HOLD/LIST */
         uint8_t idx = 0;
@@ -442,24 +855,62 @@ void SCAN01_UI_ProcessKeys(KEY_Code_t key, bool bKeyPressed, bool bKeyHeld)
         JumpMyDriver();
         break;
     case SCAN01_ACT_BRD:
-        Flash("BRD T6B");
+        if (g_st != S1_ST_BRD)
+            EnterBrd();
         break;
     case SCAN01_ACT_WX:
-        Flash("WX T6B");
+        if (g_st != S1_ST_WX)
+            EnterWx();
         break;
-    case SCAN01_ACT_MUTE:
-    case SCAN01_ACT_MUTE_TOGGLE:
-        Flash("MUTE T6B");
+    case SCAN01_ACT_MUTE:                   /* F1 short: the configured mute */
+        g_mute_10ms = (uint16_t)(g_mute_seconds * 100u);
+        MuteOn();
+        break;
+    case SCAN01_ACT_MUTE_TOGGLE:            /* F1 long: persistent */
+        g_mute_10ms = 0;
+        if (gMute)
+            MuteOff();
+        else
+            MuteOn();
+        break;
+    case SCAN01_ACT_VOL_UP:
+        VolumeChange(+1);
+        break;
+    case SCAN01_ACT_VOL_DOWN:
+        VolumeChange(-1);
         break;
     case SCAN01_ACT_GROUP:
         Flash("GROUPS P2");
         break;
-    case SCAN01_ACT_SETUP:
+    case SCAN01_ACT_SETUP:                  /* M short */
+        if (g_st == S1_ST_LIST && g_list_sel < (int16_t)PACK_CarCount()) {
+            EnterEdit();                    /* M on a LIST row = rename (vision §4.5) */
+        } else {
+            BrdTeardown();                  /* M from BRD must clear the FM path */
+            g_setup_page = 0;
+            g_setup_focus = 0;
+            SetState(S1_ST_SETUP);
+        }
+        break;
+    case SCAN01_ACT_SETUP_NEXT:             /* M short in SETUP: next page */
+        g_setup_page = (uint8_t)((g_setup_page + 1) % SETUP_PAGES);
+        g_setup_focus = 0;
+        gUpdateDisplay = true;
+        break;
+    case SCAN01_ACT_VALUE_UP:
+        if (g_st == S1_ST_SETUP)
+            SetupValueChange(+1);
+        break;
+    case SCAN01_ACT_VALUE_DOWN:
+        if (g_st == S1_ST_SETUP)
+            SetupValueChange(-1);
+        break;
     case SCAN01_ACT_KEYLOCK:
-        Flash("SETUP T6B");
+        Flash("KEYLOCK T6C");
         break;
     case SCAN01_ACT_BACK:
-        StartScan();
+        if (g_st == S1_ST_SETUP)
+            StartScan();
         break;
     case SCAN01_ACT_TYPE_UPDATE:
         gUpdateDisplay = true;
@@ -485,10 +936,12 @@ void SCAN01_UI_Tick10ms(void)
         StartScan();                        /* the SCAN state must actually scan; note this
                                              * overrides SCAN_RESUME_MODE=0 (stop on carrier)
                                              * — the edition always resumes scanning */
-
     if (g_flash_10ms > 0)
         if (--g_flash_10ms == 0)
             gUpdateDisplay = true;
+    if (g_mute_10ms > 0)
+        if (--g_mute_10ms == 0)
+            MuteOff();                      /* the 10 s mute expires */
     SCAN01_KEYS_Tick10ms();
 }
 
@@ -585,6 +1038,9 @@ static void RenderListen(void)
         snprintf(state, sizeof(state), "HOLD %s", (car != NULL) ? car->number : (station != NULL ? station->name : ""));
         DrawGlyph(5, 0, GLYPH_HOLD);
         PrintSmallAt(5, 9, state);
+    } else if (PACK_IsPractice()) {
+        DrawGlyph(5, 0, GLYPH_SCAN);
+        PrintSmallAt(5, 9, "PRACTICE");
     } else {
         DrawGlyph(5, 0, GLYPH_SCAN);
         PrintSmallAt(5, 9, "SCAN");
@@ -626,7 +1082,21 @@ static void RenderList(void)
         strncpy(num, car->number, 3);
         num[3] = 0;
         UI_PrintString(num, 0, 0, row, 7);
-        PrintSmallAt(row + 1, 20, car->name);        /* wireframe: name only */
+        /* venue divider: the first venue-1 row shows the second venue's name
+         * instead of the car name, with a rule above the row (spec §4.3) */
+        if (idx > 0) {
+            const PackCar_t *prev = PACK_GetCar((uint8_t)(idx - 1));
+            if (prev != NULL && prev->venue != car->venue) {
+                char div[15];
+                snprintf(div, sizeof(div), "- %s -", PACK_Venue2());
+                PrintSmallAt(row + 1, 20, div);
+                UI_DrawLineBuffer(gFrameBuffer, 20, (int16_t)((row) * 8 + 8), 127, (int16_t)((row) * 8 + 8), 1);
+            } else {
+                PrintSmallAt(row + 1, 20, car->name);   /* wireframe: name only */
+            }
+        } else {
+            PrintSmallAt(row + 1, 20, car->name);
+        }
         if (CarLocked(car))
             UI_DrawLineBuffer(gFrameBuffer, 20, (int16_t)((row + 1) * 8 + 8), 127, (int16_t)((row + 1) * 8 + 8), 1);
     }
@@ -686,6 +1156,67 @@ static void RenderIdentity(void)
     ST7565_BlitFullScreen();
 }
 
+static void RenderBrd(void)
+{
+    char freq[12];
+    char state[16];
+    uint8_t count = BrdPresetCount();
+    uint8_t cur = 0;
+    uint32_t cur_hz = (uint32_t)gEeprom.FM_FrequencyPlaying * 100000u;
+    const PackStation_t *st = NULL;
+
+    for (uint8_t i = 0; i < count; i++)
+        if (BrdPreset(i)->freq_hz == cur_hz) {
+            cur = i;
+            st = BrdPreset(i);
+            break;
+        }
+    if (st == NULL && count > 0)
+        st = BrdPreset(0);
+
+    UI_DisplayStatus();
+    UI_DisplayClear();
+
+    if (st != NULL)
+        RACING_PrintNumber(gFrameBuffer, 0, 127, st->name);
+    snprintf(freq, sizeof(freq), "%u.%u", gEeprom.FM_FrequencyPlaying / 10,
+             gEeprom.FM_FrequencyPlaying % 10);
+    UI_PrintStringSmallBold(freq, 0, 0, 4);
+
+    if (g_flash_10ms > 0) {
+        PrintSmallAt(5, 9, g_flash);
+    } else {
+        snprintf(state, sizeof(state), "BRD %u of %u", (unsigned)(cur + 1), (unsigned)count);
+        DrawGlyph(5, 0, GLYPH_HOLD);
+        PrintSmallAt(5, 9, state);
+    }
+    PrintSmallAt(6, 0, "PTT = back");
+    ST7565_BlitFullScreen();
+}
+
+static void RenderWx(void)
+{
+    char wx[8];
+    char freq[12];
+
+    UI_DisplayStatus();
+    UI_DisplayClear();
+
+    snprintf(wx, sizeof(wx), "WX %u", (unsigned)(g_wx_channel + 1));
+    RACING_PrintNumber(gFrameBuffer, 0, 127, wx);
+    FormatFreq(freq, NoaaFrequencyTable[g_wx_channel]);
+    UI_PrintStringSmallBold(freq, 0, 0, 4);
+
+    if (g_flash_10ms > 0) {
+        PrintSmallAt(5, 9, g_flash);
+    } else {
+        DrawGlyph(5, 0, GLYPH_HOLD);
+        PrintSmallAt(5, 9, "WX NOAA");
+    }
+    PrintSmallAt(6, 0, "PTT = back");
+    ST7565_BlitFullScreen();
+}
+
 void UI_DisplayScan01(void)
 {
     if (g_identity) {
@@ -703,6 +1234,18 @@ void UI_DisplayScan01(void)
     case S1_ST_CAPTURE:
         RenderCapture();
         break;
+    case S1_ST_BRD:
+        RenderBrd();
+        break;
+    case S1_ST_WX:
+        RenderWx();
+        break;
+    case S1_ST_SETUP:
+        RenderSetup();
+        break;
+    case S1_ST_EDIT:
+        RenderEdit();
+        break;
     default:
         break;
     }
@@ -717,5 +1260,10 @@ void SCAN01_UI_Init(void)
     g_capture_freq = 0;
     g_identity = true;
     g_identity_10ms = 80;                   /* 0.8 s brand/pack screen (vision §5.8) */
+    g_wx_channel = 0;
+    g_mute_10ms = 0;
+    g_mute_seconds = 10;
+    g_setup_page = 0;
+    g_setup_focus = 0;
     SCAN01_KEYS_Init();
 }

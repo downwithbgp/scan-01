@@ -82,6 +82,8 @@ bool     PACK_IsDemo(void);              /* the flash-resident demo pack is acti
 bool     PACK_IsSealed(void);
 void     PACK_SetPractice(bool practice);
 bool     PACK_IsPractice(void);
+bool     PACK_SetSealed(bool sealed);
+bool     PACK_RenameCar(uint8_t car_index, const char *name);
 
 /* Accessors (consumed by the UI and the scan engine) */
 uint8_t           PACK_CarCount(void);

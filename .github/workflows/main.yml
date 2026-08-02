@@ -27,6 +27,8 @@ jobs:
         /tmp/test_font
         gcc -Wall -Werror -Wextra -I. tests/test_keys.c scan01_keys.c -o /tmp/test_keys
         /tmp/test_keys
+        gcc -Wall -Werror -Wextra -I. tests/test_edit.c scan01_edit.c -o /tmp/test_edit
+        /tmp/test_edit
 
     - name: Build the scan01 edition
       run: |

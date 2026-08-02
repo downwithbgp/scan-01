@@ -100,6 +100,8 @@ static void test_scan_matrix(void)
 
     /* navigation */
     expect_action(press(KEY_UP), SCAN01_ACT_LIST, "SCAN: UP → LIST");
+    expect_action(held(KEY_UP), SCAN01_ACT_VOL_UP, "SCAN: held UP → volume up");
+    expect_action(held(KEY_DOWN), SCAN01_ACT_VOL_DOWN, "SCAN: held DOWN → volume down");
     expect_action(press(KEY_DOWN), SCAN01_ACT_LIST, "SCAN: DOWN → LIST");
     expect_action(press(KEY_STAR), SCAN01_ACT_SCAN, "SCAN: * short → SCAN (no-op)");
     expect_action(press(KEY_F), SCAN01_ACT_FAVORITES, "SCAN: # → favorites");
@@ -126,6 +128,8 @@ static void test_hold_matrix(void)
     expect_action(release(KEY_PTT), SCAN01_ACT_CAPTURE, "HOLD: PTT long → CAPTURE");
 
     expect_action(press(KEY_UP), SCAN01_ACT_NAV_UP, "HOLD: UP → prev car");
+    expect_action(held(KEY_UP), SCAN01_ACT_VOL_UP, "HOLD: held UP → volume up");
+    expect_action(held(KEY_DOWN), SCAN01_ACT_VOL_DOWN, "HOLD: held DOWN → volume down");
     expect_action(press(KEY_DOWN), SCAN01_ACT_NAV_DOWN, "HOLD: DOWN → next car");
     expect_action(press(KEY_STAR), SCAN01_ACT_SCAN, "HOLD: * short → SCAN");
     expect_action(held(KEY_STAR), SCAN01_ACT_LOCKOUT, "HOLD: * held → lockout");
@@ -149,7 +153,8 @@ static void test_list_matrix(void)
     expect_action(release(KEY_PTT), SCAN01_ACT_CAPTURE, "LIST: PTT long → CAPTURE");
     expect_action(press(KEY_UP), SCAN01_ACT_NAV_UP, "LIST: UP scrolls");
     expect_action(press(KEY_DOWN), SCAN01_ACT_NAV_DOWN, "LIST: DOWN scrolls");
-    expect_action(held(KEY_UP), SCAN01_ACT_NAV_UP, "LIST: UP held repeats");
+    expect_action(held(KEY_UP), SCAN01_ACT_NAV_UP, "LIST: UP held scrolls (not volume)");
+    expect_action(held(KEY_DOWN), SCAN01_ACT_NAV_DOWN, "LIST: DOWN held scrolls");
     expect_action(press(KEY_STAR), SCAN01_ACT_SCAN, "LIST: * short → SCAN");
     expect_action(held(KEY_STAR), SCAN01_ACT_LOCKOUT, "LIST: * held → lockout selected");
     expect_action(press(KEY_EXIT), SCAN01_ACT_SCAN, "LIST: EXIT → SCAN");
@@ -168,9 +173,11 @@ static void test_setup_matrix(void)
     expect_action(release(KEY_PTT), SCAN01_ACT_NONE, "SETUP: PTT release consumed");
     expect_action(press(KEY_EXIT), SCAN01_ACT_BACK, "SETUP: EXIT → back");
     expect_action(held(KEY_EXIT), SCAN01_ACT_HOME, "SETUP: EXIT held → HOME");
-    expect_action(press(KEY_MENU), SCAN01_ACT_BACK, "SETUP: M → back");
-    expect_action(press(KEY_UP), SCAN01_ACT_NAV_UP, "SETUP: UP → value");
-    expect_action(press(KEY_DOWN), SCAN01_ACT_NAV_DOWN, "SETUP: DOWN → value");
+    expect_action(press(KEY_MENU), SCAN01_ACT_SETUP_NEXT, "SETUP: M → next page");
+    expect_action(press(KEY_UP), SCAN01_ACT_NAV_UP, "SETUP: UP → focus");
+    expect_action(held(KEY_UP), SCAN01_ACT_VALUE_UP, "SETUP: held UP → edit value");
+    expect_action(held(KEY_DOWN), SCAN01_ACT_VALUE_DOWN, "SETUP: held DOWN → edit value");
+    expect_action(press(KEY_DOWN), SCAN01_ACT_NAV_DOWN, "SETUP: DOWN → focus");
     expect_action(press(KEY_2), SCAN01_ACT_NONE, "SETUP: digits → nothing");
     expect_action(held(KEY_0), SCAN01_ACT_NONE, "SETUP: 0 held → nothing");
     expect_action(held(KEY_5), SCAN01_ACT_NONE, "SETUP: 5 held → nothing");

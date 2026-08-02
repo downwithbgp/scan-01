@@ -79,7 +79,7 @@ Rams: *"Good design makes a product understandable… it explains itself."* The 
 
 **The seven rules:**
 
-1. The **knob is volume** — in every listening state. (Only inside SETUP does it temporarily edit values.)
+1. The **volume control is instant** — in every listening state. *Hardware note (T6b): the stock UV-K5/K6's top knob is a power switch only — the firmware's GPIO map has no encoder pins (the community "rotary knob mod" exists precisely because of this). On stock hardware the gesture is **held ▲/▼** (repeats), with a SETUP slider as backup; the v2 open-hardware scanner wires a real encoder and restores the literal rule.* (Only inside SETUP does the control temporarily edit values.)
 2. The **biggest button** (PTT) is **HOLD**: lock the car you're hearing / resume scanning.
 3. **Type a car number** (1–3 digits, optional suffix letter — "29A") to hear that car — anywhere outside SETUP.
 4. The radio **boots into SCAN** and scanning never stops unless you hold.

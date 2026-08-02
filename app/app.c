@@ -91,8 +91,8 @@ static void ProcessKey(KEY_Code_t Key, bool bKeyPressed, bool bKeyHeld);
 
 
 void (*ProcessKeysFunctions[])(KEY_Code_t Key, bool bKeyPressed, bool bKeyHeld) = {
-    [DISPLAY_MAIN] = &MAIN_ProcessKeys,
 #ifdef ENABLE_FEAT_SCAN01
+    [DISPLAY_MAIN] = &SCAN01_UI_ProcessKeys,
     [DISPLAY_SCAN01] = &SCAN01_UI_ProcessKeys,
     [DISPLAY_MENU] = &SCAN01_UI_ProcessKeys,   /* never selected; no NULL hole */
 #else
@@ -1579,8 +1579,10 @@ void APP_TimeSlice500ms(void)
     if (gDTMF_RX_live_timeout > 0)
     {
         #ifdef ENABLE_RSSI_BAR
+#ifndef ENABLE_FEAT_SCAN01
             if (center_line == CENTER_LINE_DTMF_DEC ||
                 center_line == CENTER_LINE_NONE)  // wait till the center line is free for us to use before timing out
+#endif
         #endif
         {
             if (--gDTMF_RX_live_timeout == 0)
