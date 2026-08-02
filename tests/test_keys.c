@@ -453,6 +453,16 @@ static void test_state_transitions(void)
     expect_action(press(KEY_PTT), SCAN01_ACT_BACK, "STATE: PTT in SETUP → BACK (no CAPTURE)");
     expect_action(release(KEY_PTT), SCAN01_ACT_NONE, "STATE: release consumed");
 
+    /* a PTT release in a different state than its press is consumed:
+     * CAPTURE SAVE acts on press and switches to SCAN — the release must
+     * not re-read as HOLD */
+    reset();
+    SCAN01_KEYS_SetUiState(SCAN01_UI_CAPTURE);
+    SCAN01_TYPE_SetAutoCommit(false);
+    expect_action(press(KEY_PTT), SCAN01_ACT_SAVE, "STATE: CAPTURE PTT press → SAVE");
+    SCAN01_KEYS_SetUiState(SCAN01_UI_SCAN);     /* the UI switched state on save */
+    expect_action(release(KEY_PTT), SCAN01_ACT_NONE, "STATE: release consumed after state change");
+
     /* leaving CAPTURE restores auto-commit (CAPTURE is the only off-switch) */
     reset();
     SCAN01_KEYS_SetUiState(SCAN01_UI_CAPTURE);

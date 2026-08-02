@@ -39,6 +39,10 @@ static Scan01UiState_t g_ui_state;
 static bool            g_ptt_armed;        /* PTT down and hold timer running */
 static uint16_t        g_ptt_hold_10ms;
 static bool            g_ptt_capture_latch; /* hold expired → CAPTURE on release */
+static Scan01UiState_t g_ptt_press_state; /* state at PTT press; a release in a
+                                             different state is consumed (the
+                                             press already acted — e.g. CAPTURE
+                                             SAVE switched us to SCAN) */
 
 static char            g_type_buf[TYPE_BUF_MAX + 1];
 static uint8_t         g_type_len;
@@ -167,6 +171,7 @@ void SCAN01_KEYS_Init(void)
     g_ptt_armed = false;
     g_ptt_hold_10ms = 0;
     g_ptt_capture_latch = false;
+    g_ptt_press_state = SCAN01_UI_SCAN;
     g_type_len = 0;
     g_type_buf[0] = 0;
     g_type_freq = false;
@@ -281,6 +286,7 @@ Scan01Action_t SCAN01_KEYS_ProcessKey(KEY_Code_t key, bool bKeyPressed, bool bKe
     /* ---- PTT (press/release only from the base; our own hold timer) ---- */
     if (key == KEY_PTT) {
         if (bKeyPressed) {
+            g_ptt_press_state = g_ui_state; /* any release lands elsewhere: consumed */
             if (g_ui_state == SCAN01_UI_SETUP)
                 return SCAN01_ACT_BACK;
             if (g_ui_state == SCAN01_UI_CAPTURE)
@@ -295,6 +301,8 @@ Scan01Action_t SCAN01_KEYS_ProcessKey(KEY_Code_t key, bool bKeyPressed, bool bKe
         /* release: CAPTURE (after a full hold) or HOLD/RESUME (quick tap) */
         if (g_ui_state == SCAN01_UI_CAPTURE || g_ui_state == SCAN01_UI_SETUP)
             return SCAN01_ACT_NONE;         /* the press already handled it */
+        if (g_ui_state != g_ptt_press_state)
+            return SCAN01_ACT_NONE;         /* state changed mid-press: consumed */
         if (g_ptt_capture_latch) {
             g_ptt_capture_latch = false;
             g_ptt_armed = false;

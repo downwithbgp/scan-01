@@ -39,6 +39,9 @@
 #include "ui/scanner.h"
 #include "ui/ui.h"
 #include "../misc.h"
+#ifdef ENABLE_FEAT_SCAN01
+    #include "scan01_ui.h"
+#endif
 
 GUI_DisplayType_t gScreenToDisplay;
 GUI_DisplayType_t gRequestDisplayScreen = DISPLAY_INVALID;
@@ -50,7 +53,12 @@ bool              gAskToDelete;
 
 void (*UI_DisplayFunctions[])(void) = {
     [DISPLAY_MAIN] = &UI_DisplayMain,
+#ifdef ENABLE_FEAT_SCAN01
+    [DISPLAY_SCAN01] = &UI_DisplayScan01,
+    [DISPLAY_MENU] = &UI_DisplayScan01,     /* never selected; no NULL hole */
+#else
     [DISPLAY_MENU] = &UI_DisplayMenu,
+#endif
     [DISPLAY_SCANNER] = &UI_DisplayScanner,
 
 #ifdef ENABLE_FMRADIO

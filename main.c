@@ -30,6 +30,9 @@
 #include "settings.h"
 #ifdef ENABLE_FEAT_SCAN01
 #include "settings_pack.h"
+#ifdef ENABLE_FEAT_SCAN01
+    #include "scan01_ui.h"
+#endif
 #endif
 #include "version.h"
 
@@ -112,6 +115,10 @@ void Main(void)
 
     #ifdef ENABLE_FEAT_SCAN01
         PACK_Init();    // pack layer: load, or install the demo pack (spec §8)
+#ifdef ENABLE_FEAT_SCAN01
+        SCAN01_UI_Init();
+        gRequestDisplayScreen = DISPLAY_SCAN01;
+#endif
     #endif
 
     #ifdef ENABLE_FEAT_F4HWN
@@ -270,6 +277,11 @@ void Main(void)
 #endif
 
         BOOT_ProcessMode(BootMode);
+#ifdef ENABLE_FEAT_SCAN01
+        /* BOOT_ProcessMode selects DISPLAY_MAIN; take over for the edition
+         * directly — gRequestDisplayScreen is consumed only on key events */
+        GUI_SelectNextDisplay(DISPLAY_SCAN01);
+#endif
 
         GPIO_ClearBit(&GPIOA->DATA, GPIOA_PIN_VOICE_0);
 
@@ -343,7 +355,7 @@ void Main(void)
     #endif
     */
 
-    #ifdef ENABLE_FEAT_F4HWN_RESUME_STATE
+    #if defined(ENABLE_FEAT_F4HWN_RESUME_STATE) && !defined(ENABLE_FEAT_SCAN01)
         if (gEeprom.CURRENT_STATE == 2 || gEeprom.CURRENT_STATE == 5) {
             gScanRangeStart = gScanRangeStart ? 0 : gTxVfo->pRX->Frequency;
             gScanRangeStop = gEeprom.VfoInfo[!gEeprom.TX_VFO].freq_config_RX.Frequency;

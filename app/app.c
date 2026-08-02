@@ -27,6 +27,9 @@
 #endif
 #include "app/app.h"
 #include "app/chFrScanner.h"
+#ifdef ENABLE_FEAT_SCAN01
+    #include "scan01_ui.h"
+#endif
 #include "app/dtmf.h"
 #ifdef ENABLE_FLASHLIGHT
     #include "app/flashlight.h"
@@ -89,7 +92,12 @@ static void ProcessKey(KEY_Code_t Key, bool bKeyPressed, bool bKeyHeld);
 
 void (*ProcessKeysFunctions[])(KEY_Code_t Key, bool bKeyPressed, bool bKeyHeld) = {
     [DISPLAY_MAIN] = &MAIN_ProcessKeys,
+#ifdef ENABLE_FEAT_SCAN01
+    [DISPLAY_SCAN01] = &SCAN01_UI_ProcessKeys,
+    [DISPLAY_MENU] = &SCAN01_UI_ProcessKeys,   /* never selected; no NULL hole */
+#else
     [DISPLAY_MENU] = &MENU_ProcessKeys,
+#endif
     [DISPLAY_SCANNER] = &SCANNER_ProcessKeys,
 
 #ifdef ENABLE_FMRADIO
@@ -1358,6 +1366,9 @@ static void CheckKeys(void)
 void APP_TimeSlice10ms(void)
 {
     gNextTimeslice = false;
+#ifdef ENABLE_FEAT_SCAN01
+    SCAN01_UI_Tick10ms();
+#endif
     gFlashLightBlinkCounter++;
 
 #ifdef ENABLE_AM_FIX
@@ -1535,7 +1546,9 @@ void cancelUserInputModes(void)
 void APP_TimeSlice500ms(void)
 {
     gNextTimeslice_500ms = false;
+#ifndef ENABLE_FEAT_SCAN01
     bool exit_menu = false;
+#endif
 
     // Skipped authentic device check
 
@@ -1581,9 +1594,11 @@ void APP_TimeSlice500ms(void)
         }
     }
 
+#ifndef ENABLE_FEAT_SCAN01
     if (gMenuCountdown > 0)
         if (--gMenuCountdown == 0)
             exit_menu = (gScreenToDisplay == DISPLAY_MENU); // exit menu mode
+#endif
 
 #ifdef ENABLE_DTMF_CALLING
     if (gDTMF_RX_timeout > 0)
@@ -1604,7 +1619,9 @@ void APP_TimeSlice500ms(void)
 
     if (gBacklightCountdown_500ms > 0 && !gAskToSave && !gCssBackgroundScan
         // don't turn off backlight if user is in backlight menu option
+#ifndef ENABLE_FEAT_SCAN01
         && !(gScreenToDisplay == DISPLAY_MENU && (UI_MENU_GetCurrentMenuId() == MENU_ABR || UI_MENU_GetCurrentMenuId() == MENU_ABR_MAX))
+#endif
         && --gBacklightCountdown_500ms == 0
         && gEeprom.BACKLIGHT_TIME < 61
     ) {
@@ -1715,6 +1732,7 @@ void APP_TimeSlice500ms(void)
             gUpdateStatus = true;            // lock symbol needs showing
         }
 
+#ifndef ENABLE_FEAT_SCAN01
         if (exit_menu) {
             gMenuCountdown = 0;
 
@@ -1766,6 +1784,7 @@ void APP_TimeSlice500ms(void)
                 GUI_SelectNextDisplay(disp);
             }
         }
+#endif
     }
 
     if (!gPttIsPressed && gVFOStateResumeCountdown_500ms > 0 && --gVFOStateResumeCountdown_500ms == 0) {
@@ -1902,11 +1921,15 @@ static void ProcessKey(KEY_Code_t Key, bool bKeyPressed, bool bKeyHeld)
         }
     }
     else { // key pressed or held
+#ifndef ENABLE_FEAT_SCAN01
         const int m = UI_MENU_GetCurrentMenuId();
+#endif
         if  (   //not when PTT and the backlight shouldn't turn on on TX
                 !(Key == KEY_PTT && !(gSetting_backlight_on_tx_rx & BACKLIGHT_ON_TR_TX))
+#ifndef ENABLE_FEAT_SCAN01
                 // not in the backlight menu
                 && !(gScreenToDisplay == DISPLAY_MENU && ( m == MENU_ABR || m == MENU_ABR_MAX || m == MENU_ABR_MIN))
+#endif
             )
         {
             BACKLIGHT_TurnOn();
@@ -1930,8 +1953,10 @@ static void ProcessKey(KEY_Code_t Key, bool bKeyPressed, bool bKeyHeld)
 #endif
         }
 
+#ifndef ENABLE_FEAT_SCAN01
         if (gScreenToDisplay == DISPLAY_MENU)       // 1of11
             gMenuCountdown = menu_timeout_500ms;
+#endif
 
 #ifdef ENABLE_DTMF_CALLING
         if (gDTMF_DecodeRingCountdown_500ms > 0) { // cancel the ringing
@@ -2112,7 +2137,12 @@ static void ProcessKey(KEY_Code_t Key, bool bKeyPressed, bool bKeyHeld)
         }
 #endif
     }
-#ifdef ENABLE_FEAT_F4HWN // For F + SIDE1 or F + SIDE2
+#if defined(ENABLE_FEAT_SCAN01)
+    /* the side keys ARE F1/F2 in this edition (vision §4.2) — route them */
+    else if (gScreenToDisplay != DISPLAY_INVALID) {
+        ProcessKeysFunctions[gScreenToDisplay](Key, bKeyPressed, bKeyHeld);
+    }
+#elif defined(ENABLE_FEAT_F4HWN) // For F + SIDE1 or F + SIDE2
     else if (gWasFKeyPressed && (Key == KEY_SIDE1 || Key == KEY_SIDE2)) {
         ProcessKeysFunctions[gScreenToDisplay](Key, bKeyPressed, bKeyHeld);
     }
@@ -2141,6 +2171,7 @@ Skip:
         gBeepToPlay = BEEP_NONE;
     }
 
+#ifndef ENABLE_FEAT_SCAN01
     if (gFlagAcceptSetting) {
         gMenuCountdown = menu_timeout_500ms;
 
@@ -2149,6 +2180,7 @@ Skip:
         gFlagRefreshSetting = true;
         gFlagAcceptSetting  = false;
     }
+#endif
 
     if (gRequestSaveSettings) {
         if (!bKeyHeld)
@@ -2178,7 +2210,11 @@ Skip:
     }
 
     if (gRequestSaveChannel > 0) { // TODO: remove the gRequestSaveChannel, why use global variable for that??
+#ifndef ENABLE_FEAT_SCAN01
         if ((!bKeyHeld && !bKeyPressed) || UI_MENU_GetCurrentMenuId())
+#else
+        if (!bKeyHeld && !bKeyPressed)
+#endif
         {
             SETTINGS_SaveChannel(gTxVfo->CHANNEL_SAVE, gEeprom.TX_VFO, gTxVfo, gRequestSaveChannel);
 
@@ -2237,12 +2273,14 @@ Skip:
             ACTION_Monitor();   // 1of11
     }
 
+#ifndef ENABLE_FEAT_SCAN01
     if (gFlagRefreshSetting) {
         gFlagRefreshSetting = false;
         gMenuCountdown      = menu_timeout_500ms;
 
         MENU_ShowCurrentSetting();
     }
+#endif
 
     if (gFlagPrepareTX) {
         RADIO_PrepareTX();

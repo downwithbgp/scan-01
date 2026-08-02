@@ -218,6 +218,7 @@ OBJS += settings_pack.o
 OBJS += font_racing.o
 OBJS += font_racing_data.o
 OBJS += scan01_keys.o
+OBJS += scan01_ui.o
 endif
 
 ifeq ($(OS), Windows_NT) # windows

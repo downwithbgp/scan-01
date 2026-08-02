@@ -23,6 +23,9 @@
 enum GUI_DisplayType_t
 {
     DISPLAY_MAIN = 0,
+#ifdef ENABLE_FEAT_SCAN01
+    DISPLAY_SCAN01,
+#endif
     DISPLAY_MENU,
     DISPLAY_SCANNER,
 

@@ -72,9 +72,9 @@ or directly:
 
 Output: `scan01.packed.bin` (plus `scan01`, `scan01.bin`). The build is
 gated: text must stay within 59.5 KB (60 KB minus a 512 B no-brick floor).
-CI enforces this on every push. Flash budget: the pack layer (T3) costs
-~3.1 KB; the stock ham menu stack (~9.3 KB in `ui/menu.o` + `app/menu.o`)
-is budgeted for removal when the Scan 01 UI replaces it (T6).
+CI enforces this on every push. Flash budget: the pack layer (T3) ~3.1 KB,
+the racing font ~2.4 KB, the key layer ~1.1 KB, the Scan 01 UI ~7.4 KB;
+the stock ham menu stack (~9.3 KB) was removed when the UI landed (T6a).
 
 ### Running the tests
 
