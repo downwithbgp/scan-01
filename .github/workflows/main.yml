@@ -75,14 +75,13 @@ jobs:
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
+        git push --force origin "$GITHUB_SHA:refs/tags/user-testing"
         if ! gh release view user-testing >/dev/null 2>&1; then
           gh release create user-testing --prerelease \
             --title "User testing build" \
-            --notes "Rolling build of \`main\` for testers — see the user testing guide (docs/user-testing.md)." \
-            --target "$GITHUB_SHA"
+            --notes "Rolling build of \`main\` for testers — see https://github.com/downwithbgp/scan-01/blob/main/docs/user-testing.md"
         else
-          git push --force origin "$GITHUB_SHA:refs/tags/user-testing"
           gh release edit user-testing \
-            --notes "Rolling build of \`main\` @ \`$GITHUB_SHA\` — see the user testing guide (docs/user-testing.md)."
+            --notes "Rolling build of \`main\` @ \`$GITHUB_SHA\` — see https://github.com/downwithbgp/scan-01/blob/main/docs/user-testing.md"
         fi
         gh release upload user-testing scan01.packed.bin --clobber
