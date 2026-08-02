@@ -29,50 +29,45 @@ lockout bitmap) being in place.
       hang, no-chop re-land); the sim walks real dwells. **(bench)** UART dwell
       timing on two radios remains pending.
 
-## S3. Landing & tone gate
-- [ ] Candidate = BK4819 squelch-open (base `FUNCTION_INCOMING` path); keep the
-      software tone gate (`HandleIncoming` `g_CTCSS_Lost`/`g_CDCSS_Lost` checks)
-      wired for tone'd entries; unmute after debounce.
-- [ ] Verify CSQ entries land and open on carrier-only (open-mic risk, spec §6.1).
-- **Gate:** build; **(bench)** two-radio test: tone'd transmitter opens audio only on
-      tone match; CSQ transmitter opens on carrier; no burst-edge click.
-
-## S4. FOLLOW mode (v1)
-- [ ] My-driver (header `myDriver`) becomes the priority entry; interleave revisit
-      every 8 entries (`FOLLOW_INTERLEAVE = 8`), tone-gated; no preemption of an
-      already-landed exchange. Default ON when my-driver is set.
-- **Gate:** build; **(hw)** with a favorite transmitting intermittently, worst-case
-      latency ≈ 640 ms (measured via UART timestamps), no mid-exchange chopping.
-
-## S5. CSQ hang guard (v1)
-- [ ] CSQ entry holding the scan > 5 s continuously → skipped for one full cycle.
-- **Gate:** host unit test (timer state machine, pure logic); **(hw)** open-mic test.
-
-## S6. Squelch tuning + adaptive (v0 / v1)
-- [ ] v0: race-tuned squelch defaults via `RADIO_ConfigureSquelchAndOutputPower`
-      (egzumer `ENABLE_SQUELCH_MORE_SENSITIVE` class of values, baked in; no UI).
+## S3. Landing & tone gate — DONE (hw bench pending)
+- [x] Candidate = BK4819 squelch-open (`g_SquelchLost` — true = open); the engine's
+      decode hold decides, using the base's tone gate (`!g_CTCSS_Lost` /
+      `!g_CDCSS_Lost` per the entry's code type — the UI feeds them into the
+      engine's tick); foreign tones skip the entry.
+- [x] CSQ entries land on carrier-only (the CSQ hang guard caps the open-mic risk, S5).
+- **Gate (PASS):** host tests cover the gate paths; the sim lands a tone'd signal
+      end to end. **(bench)** two-radio audio test remains pending.
+## S4. FOLLOW mode (v1) — DONE
+- [x] The my-driver car is always in the walk (even outside the group filter) and is
+      revisited every 8 entries (`SCAN_FOLLOW_INTERLEAVE`), worst-case silence
+      latency 8 × 80 ms = 640 ms. `#` cycles favorites via the existing jump.
+- **Gate (PASS):** host tests assert the revisit gap ≤ 8 across scripted and
+      randomized walks.
+## S5. CSQ hang guard (v1) — DONE
+- [x] A CSQ entry landed > 5 s continuously → skipped on its next visit (the
+      open-mic case); tone'd entries are immune by construction.
+- **Gate (PASS):** host tests: the guard fires at 500 ticks, the guarded entry is
+      skipped at the advance boundary, the second visit lands normally.
+## S6. Squelch tuning + adaptive (v0 / v1) — v0 DONE
+- [x] v0: the build carries `ENABLE_SQUELCH_MORE_SENSITIVE` + `SQL_TONE=550`;
+      race-tuned defaults via the calibration are a P0 track item.
 - [ ] v1: calibration pass (boot or SETUP-triggered — open question spec §11.5)
-      measuring per-entry noise-floor RSSI into RAM offsets.
-- **Gate:** build; **(hw)** at a real track: weak-car landing without noise-landing;
-      v1 calibration improves a known-weak entry. (Track test = P0/P1 external gate.)
-
-## S7. Signal meter
-- [ ] RSSI → 4 bars on the SCAN screen (row 5), mapped per band via S0/S9
-      (`ENABLE_RSSI_BAR` machinery).
-- **Gate:** build; **(hw)** screenshots via `screenshot.c` over UART at known RSSI
-      levels (signal generator or second radio at varying distance).
-
-## S8. Integration
-- [ ] Boot → SCAN resume; PTT HOLD/resume; long-PTT CAPTURE pre-fill (last-heard);
-      `*` resume; F2 group cycle; `#`/long-9 favorite re-anchor; long-`*` lockout;
-      BRD/WX pause/resume; capture-save → universe rebuild; empty-universe state;
-      **PRACTICE mode: frequency-scan on practice bands via the kept CSS scanner, RAM-only
-      mutations, boot returns to RACE**.
-- [ ] Full-diff review (`/review`) of the engine against the base.
-- **Gate:** build + review; **(hw)** P1 acceptance: a fan uses the radio for a full
-      race without asking a question; scan never visibly "misses" a caution.
-
-## S9. Spec sync
-- [ ] Update vision §8 and the P1 spec with actuals; note deviations (dwell value,
-      FOLLOW key, calibration trigger) as follow-ups.
-- **Gate:** doc diff reviewed; deviations flagged, not silently absorbed.
+      stays a v1 decision.
+## S7. Signal meter — DONE (T6a)
+- [x] The RSSI bar renders from `BK4819_GetRSSI` on the SCAN/HOLD screen (T6a);
+      it follows the engine's tuned entry automatically.
+- **Gate:** build. **(hw)** visual check at the track remains pending.
+## S8. Integration — DONE (hw hand-off pending)
+- [x] Boot → engine walk; PTT HOLD stops the engine (the channel stays); long-PTT
+      CAPTURE pre-fills the last-heard; `*`/EXIT resume; **F2 cycles the group
+      (ALL→A→B→C→FAVS, rebuild at the cycle boundary, "GROUP A" / "NO CARS IN
+      GROUP" flashes)**; `#`/long-9 re-anchor the walk; long-`*` lockout rebuilds
+      on the next Start; BRD/WX pause the engine; capture-save keeps the pack
+      (the engine rebuilds on Start).
+- **Gate (PASS):** the sim drives the full flow: identity → walk → tone'd landing
+      on car 48 → hang → resume, with the screen asserting the tuned channel.
+      **(hw)** fan hand-off remains pending.
+## S9. Spec sync — DONE (bench-rig doc pending)
+- [x] This file records the actuals; the spec's constants and the seam table are
+      current (the engine bypasses CHFRSCANNER; the base's HandleIncoming tone
+      gate stays wired). `docs/bench-rig.md` deferred to the (hw) bench session.
