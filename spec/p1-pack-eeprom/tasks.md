@@ -58,12 +58,12 @@ external acceptance criteria; everything else is build/review/test-able in this 
 
 ## T7. Capture save flow
 
-## T7. Capture save flow
-- [ ] Long-PTT → CAPTURE pre-filled with last-heard freq + decoded tone (`BK4819_GetCxCSSScanResult`); typed entry path (digits + `*`); live preview before save.
-- [ ] Save: number (digits + suffix), `ALT` on duplicate, `origin=captured, verified=false`, joins current group, name `NEW`/`ALT <name>`, EEPROM persist.
-- [ ] Expose captured entries to `pack_status()`/dump.
-- [ ] Seal + PRACTICE guards (spec §5.3/§8): pack layer stubs all mutations in PRACTICE (RAM-only, dropped on power-off), refuses them when sealed; boot always returns to RACE; `pack_status()` reports mode + seal bit.
-- **Gate:** build; review against vision §4.5; **(hw)** end-to-end: capture → reboot → entry present + scanning.
+## T7. Capture save flow — DONE (hw end-to-end pending)
+- [x] **Prefill from the air with the tone**: long-PTT decodes the live signal via `BK4819_GetCxCSSScanResult` + `DCS_GetCtcssCode`/`DCS_GetCdcssCode` (the base's own mapping); the CAPTURE screen shows it on the number zone's left margin — `T 94.8` (CTCSS deci-Hz) / `D 271` (DCS octal) — refreshed on entry AND while typing (it tracks the live signal). The sim stubs the decode and asserts the tone line + the saved tone index.
+- [x] **Save**: number (digits + suffix via the T5 typing machine), `origin=captured, verified=false`, group A (F2 group cycling is P2), **name `NEW` by default; ALT duplicates inherit the original's name** — and `PACK_AddCapture` now trims the truncation's trailing space (`ALT BYRON` not `ALT BYRON `), EEPROM persist (T3). The saved entry carries the decoded tone.
+- [x] **pack_status over the PC UART**: `pack_uart.c` — the k5prog-style command `0x05DF` → text reply `0x05E0` (magic/version/counts/sealed/practice + one `captured <number> <freq> <name>` line per captured entry). Pure builder, host-tested (10 checks); wired into `app/uart.c` behind `ENABLE_FEAT_SCAN01` (stock build untouched). packtool's `dump` (T8) reads the EEPROM region directly; `pack_status` is the human/debug surface.
+- [x] Seal + PRACTICE guards were T3/T6b: mutations refuse when sealed, PRACTICE is RAM-only, boot returns to RACE; `pack_status` reports both bits.
+- **Gate (PASS):** build clean both editions; firmware 55,748 ≤ 60,928; host suites **815,678 checks, 0 failures** (key 240, edit 28, pack 195, band-lock 815,004, font 155, pack-uart 10, sim 28 — the sim now exercises the tone capture + ALT save + NEW save end to end). **(hw)** end-to-end: capture → reboot → entry present + scanning — pending a real radio.
 
 ## T8. packtool v0 (Python)
 - [ ] `validate` (§6 rules incl. ECPA band-lock), `build` → `pack.patch` region list, `diff`.

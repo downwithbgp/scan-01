@@ -26,6 +26,8 @@
 #include <string.h>
 
 #include "app/fm.h"
+#include "dcs.h"
+#include "driver/bk4819.h"
 #include "driver/st7565.h"
 #include "font_racing.h"
 #include "scan01_edit.h"
@@ -40,6 +42,7 @@ extern uint8_t g_sim_screen[8][128];
 void SIM_EEPROM_Reset(void);
 void SIM_EEPROM_Poke(uint16_t address, const void *data, uint16_t size);
 void SIM_EEPROM_SetReadOnly(bool readonly);
+void SIM_SetCssResult(BK4819_CssScanResult_t result, uint32_t cdcss, uint16_t ctcss);
 
 static int g_checks = 0;
 static int g_failures = 0;
@@ -251,57 +254,83 @@ int main(void)
         expect(rule, "list: venue divider rule visible");
     }
 
-    /* 7. CAPTURE empty */
+    /* 7. CAPTURE empty — with a live tone decode (94.8 Hz) */
+    SIM_SetCssResult(BK4819_CSS_RESULT_CTCSS, 0, 948);
     key(KEY_STAR);                          /* back to SCAN */
     ptt_hold();
     shot("07-capture-empty", true);
 
-    /* 8. CAPTURE typed */
+    /* 8. CAPTURE typed + saved with the decoded tone:
+     * "24" duplicates the pack car -> an ALT entry inheriting its name */
     digit('2');
     digit('4');
     shot("08-capture-24", true);
-    assert_right_aligned("24", 24, "capture: number input right-aligned");
+    /* the top strip carries the tone caption now — check the bottom strip */
+    assert_right_aligned("24", 48, "capture: number input right-aligned");
+    ptt_tap();                                  /* SAVE */
+    expect(PACK_CarCount() == 9, "save: entry appended");
+    {
+        const PackCar_t *c = PACK_GetCar(8);
+        expect(c != NULL && strcmp(c->number, "24") == 0, "save: number");
+        expect(c != NULL && strcmp(c->name, "ALT BYRON") == 0, "save: ALT inherits the name");
+        expect(c != NULL && c->origin == PACK_ORIGIN_CAPTURED, "save: origin captured");
+        expect(c != NULL && !c->verified, "save: unverified");
+        expect(c != NULL && c->code_type == PACK_CT_CTCSS, "save: tone type");
+        expect(c != NULL && c->tone_index == DCS_GetCtcssCode(948), "save: tone index");
+    }
 
-    /* 9. BRD (three EXITs leave CAPTURE: delete, delete, cancel) */
-    key(KEY_EXIT);
-    key(KEY_EXIT);
-    key(KEY_EXIT);
+    /* 9. the tone shows on the CAPTURE line; a fresh number saves as NEW */
+    ptt_hold();
+    shot("09-capture-tone", true);
+    expect(line_has_ink(3, 0, 45), "capture: the tone line renders");
+    digit('7');
+    digit('7');
+    ptt_tap();
+    expect(PACK_CarCount() == 10, "save: second entry");
+    {
+        const PackCar_t *c = PACK_GetCar(9);
+        expect(c != NULL && strcmp(c->number, "77") == 0, "save: fresh number");
+        expect(c != NULL && strcmp(c->name, "NEW") == 0, "save: default name NEW");
+    }
+    SIM_SetCssResult(BK4819_CSS_RESULT_NOT_FOUND, 0, 0);
+
+    /* 10. BRD */
     held(KEY_0);
-    shot("09-brd", true);
+    shot("10-brd", true);
     expect(gFmRadioMode, "brd: FM mode active");
 
     /* 10. WX (from BRD — the FM teardown must have run) */
     held(KEY_5);
-    shot("10-wx", true);
+    shot("11-wx", true);
     expect(!gFmRadioMode, "wx from brd: FM torn down");
     expect(line_has_ink(7, 0, 127), "wx: hint line");
     key(KEY_DOWN);
-    shot("11-wx-2", true);
+    shot("12-wx-2", true);
 
     /* 11. SETUP pages */
     key(KEY_STAR);
     key(KEY_MENU);
-    shot("12-setup-pack", true);
+    shot("13-setup-pack", true);
     key(KEY_MENU);
-    shot("13-setup-audio", true);
+    shot("14-setup-audio", true);
     key(KEY_MENU);
-    shot("14-setup-display", true);
+    shot("15-setup-display", true);
     key(KEY_MENU);
-    shot("15-setup-info", true);
+    shot("16-setup-info", true);
     key(KEY_EXIT);                          /* leave SETUP */
 
     /* 12. the name editor: LIST → M on car 0 → type BYRON */
     ticks(80);
     key(KEY_UP);
     key(KEY_MENU);
-    shot("16-edit-empty", true);
+    shot("17-edit-empty", true);
     digit('2'); digit('2');                 /* B */
     digit('9'); digit('9'); digit('9');     /* Y */
     digit('7'); digit('7'); digit('7');     /* R */
     digit('6'); digit('6'); digit('6');     /* O */
     ticks(160);                             /* the multi-tap window expires */
     digit('6'); digit('6');                 /* N */
-    shot("17-edit-byron", true);
+    shot("18-edit-byron", true);
     expect(strcmp(SCAN01_EDIT_GetBuffer(), "BYRON") == 0, "edit: multi-tap types BYRON");
 
     /* 13. NO PACK boot (a failing EEPROM: even the demo install fails) */
@@ -309,7 +338,7 @@ int main(void)
     SIM_EEPROM_SetReadOnly(true);
     PACK_Init();
     SCAN01_UI_Init();
-    shot("18-nopack", true);
+    shot("19-nopack", true);
     expect(!PACK_IsValid(), "nopack: no valid pack");
     expect(line_has_ink(2, 30, 100) || line_has_ink(3, 30, 100),
            "nopack: the NO PACK line renders");

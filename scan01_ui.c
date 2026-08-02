@@ -20,6 +20,7 @@
 #include "app/chFrScanner.h"
 #include "app/fm.h"
 #include "driver/bk4819.h"
+#include "dcs.h"
 #include "driver/eeprom.h"
 #include "driver/st7565.h"
 #include "external/printf/printf.h"
@@ -60,6 +61,8 @@ static uint16_t  g_mute_10ms;         /* F1 short: mute countdown */
 static uint8_t   g_mute_seconds;      /* the F1 mute duration (SETUP Audio) */
 static uint8_t   g_setup_page;        /* SETUP 0-3: Pack / Audio / Display / Info */
 static uint8_t   g_setup_focus;       /* the focused row on the page */
+static uint8_t   g_capture_tone_index; /* the decoded tone of the capture freq */
+static uint8_t   g_capture_code_type;  /* PACK_CT_* */
 
 /* ---- 8 px state glyphs (◉ ◼ ▸) — hand-drawn, column-major ---- */
 static const uint8_t GLYPH_SCAN[8] = { 0x3C, 0x42, 0x99, 0xA5, 0xA5, 0x99, 0x42, 0x3C };
@@ -450,14 +453,28 @@ static void SaveCapture(void)
         Flash("NO FREQ");
         return;
     }
+    if (PACK_IsSealed()) {
+        Flash("SEALED");
+        return;
+    }
     PackCar_t car;
     memset(&car, 0, sizeof(car));
     strncpy(car.number, num, 3);
     car.number[3] = 0;
     car.freq_hz = g_capture_freq;
+    car.tone_index = g_capture_tone_index;
+    car.code_type = g_capture_code_type;
     car.group = PACK_GROUP_A;
     car.narrow = true;
-    car.name[0] = 0;                        /* PACK_AddCapture fills "NEW"-ish */
+    /* the name: "NEW" by default; an ALT duplicate inherits the original's
+     * name so the LIST reads "ALT BYRON W" (vision §4.5) */
+    {
+        const PackCar_t *dup = CarByNumber(car.number);
+        if (dup != NULL)
+            strncpy(car.name, dup->name, 10), car.name[10] = 0;
+        else
+            strcpy(car.name, "NEW");
+    }
     if (!PACK_AddCapture(&car)) {
         Flash("PACK FULL");
         return;
@@ -495,6 +512,32 @@ static void HandleCommit(const char *entry)
         return;
     }
     TuneCar(car);
+}
+
+/* ---- CAPTURE tone (vision §5.9: the tone shows as confirmation of what
+ * gets saved — the BK4819's live decode of the current signal) ---- */
+
+static void CaptureRefreshTone(void)
+{
+    uint32_t cdcss_freq = 0;
+    uint16_t ctcss_freq = 0;
+    BK4819_CssScanResult_t result = BK4819_GetCxCSSScanResult(&cdcss_freq, &ctcss_freq);
+
+    g_capture_tone_index = 0;
+    g_capture_code_type = PACK_CT_NONE;
+    if (result == BK4819_CSS_RESULT_CTCSS) {
+        uint8_t code = DCS_GetCtcssCode((int)ctcss_freq);
+        if (code != 0xFF) {
+            g_capture_tone_index = code;
+            g_capture_code_type = PACK_CT_CTCSS;
+        }
+    } else if (result == BK4819_CSS_RESULT_CDCSS) {
+        uint8_t code = DCS_GetCdcssCode(cdcss_freq);
+        if (code != 0xFF) {
+            g_capture_tone_index = code;
+            g_capture_code_type = PACK_CT_DCS;
+        }
+    }
 }
 
 /* ---- SETUP (vision §5.5: four boring pages; M = next page, held ▲▼ edits) ---- */
@@ -758,6 +801,8 @@ void SCAN01_UI_ProcessKeys(KEY_Code_t key, bool bKeyPressed, bool bKeyHeld)
         if (g_st == S1_ST_LIST && g_list_sel == (int16_t)PACK_CarCount()) {
             /* ＋ NEW row is a button: the big button opens it */
             g_capture_freq = gRxVfo->freq_config_RX.Frequency;
+            TuneFreq(g_capture_freq);
+            CaptureRefreshTone();
             SetState(S1_ST_CAPTURE);
         } else {
             StartScan();
@@ -773,6 +818,7 @@ void SCAN01_UI_ProcessKeys(KEY_Code_t key, bool bKeyPressed, bool bKeyHeld)
             g_capture_freq = gRxVfo->freq_config_RX.Frequency;
         }
         TuneFreq(g_capture_freq);
+        CaptureRefreshTone();               /* the prefill's decoded tone */
         SCAN01_TYPE_Reset();
         SetState(S1_ST_CAPTURE);
         break;
@@ -913,6 +959,8 @@ void SCAN01_UI_ProcessKeys(KEY_Code_t key, bool bKeyPressed, bool bKeyHeld)
             StartScan();
         break;
     case SCAN01_ACT_TYPE_UPDATE:
+        if (g_st == S1_ST_CAPTURE)
+            CaptureRefreshTone();           /* the tone tracks the live signal */
         gUpdateDisplay = true;
         break;
     default:
@@ -1129,6 +1177,19 @@ static void RenderCapture(void)
     uint8_t x = (len >= 9) ? 0 : (uint8_t)((128 - len * 13) / 2);
     UI_DisplayFrequency(freq, x, 0, false);
 
+    /* the decoded tone, 8 px, on the number zone's left margin — the
+     * confirmation of what PTT will save (vision §5.9) */
+    if (g_capture_code_type != PACK_CT_NONE) {
+        char tone[10];
+        if (g_capture_code_type == PACK_CT_CTCSS)
+            snprintf(tone, sizeof(tone), "T %u.%u",
+                     CTCSS_Options[g_capture_tone_index] / 10,
+                     CTCSS_Options[g_capture_tone_index] % 10);
+        else
+            snprintf(tone, sizeof(tone), "D %03o", DCS_Options[g_capture_tone_index]);
+        PrintSmallAt(2, 0, tone);
+    }
+
     /* number input, 32 px racing digits, right-aligned (lines 2-5) */
     RACING_PrintNumber(gFrameBuffer, 2, 127, num);
 
@@ -1272,5 +1333,7 @@ void SCAN01_UI_Init(void)
     g_mute_seconds = 10;
     g_setup_page = 0;
     g_setup_focus = 0;
+    g_capture_tone_index = 0;
+    g_capture_code_type = PACK_CT_NONE;
     SCAN01_KEYS_Init();
 }

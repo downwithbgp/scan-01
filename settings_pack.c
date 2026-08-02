@@ -42,7 +42,7 @@ void EEPROM_WriteBuffer(uint16_t Address, const void *pBuffer);
 #define PACK_FLAGS_OFF      0x39u
 #define PACK_FLAG_SEALED    0x01u
 #define PACK_MAGIC          { 'S', 'C', '0', '1' }
-#define PACK_VERSION        0x01u
+#define PACK_VERSION        0x01u   /* exported via settings_pack.h */
 
 /* ---- RAM state ---- */
 #define PACK_STATION_CHANNEL_BASE 64u   /* stations live at ch 64..87 so captures
@@ -513,6 +513,8 @@ bool PACK_AddCapture(const PackCar_t *entry)
         strcpy(g_cars[n].name, "ALT ");
         strncpy(g_cars[n].name + 4, entry->name, 7);
         g_cars[n].name[10] = 0;
+        while (g_cars[n].name[0] && g_cars[n].name[9] == ' ')
+            g_cars[n].name[9] = 0;          /* no trailing space from truncation */
     }
     g_car_count = (uint8_t)(n + 1);
 

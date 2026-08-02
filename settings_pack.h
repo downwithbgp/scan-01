@@ -21,6 +21,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#define PACK_VERSION        0x01u
 #define PACK_MAX_CARS       64
 #define PACK_MAX_STATIONS   24
 

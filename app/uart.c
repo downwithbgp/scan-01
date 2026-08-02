@@ -36,6 +36,7 @@
 #include "functions.h"
 #include "misc.h"
 #include "settings.h"
+#include "pack_uart.h"
 #include "version.h"
 
 #if defined(ENABLE_OVERLAY)
@@ -619,6 +620,22 @@ void UART_HandleCommand(void)
             break;
 #endif
     
+#ifdef ENABLE_FEAT_SCAN01
+        case PACK_UART_STATUS_CMD: {
+            /* Scan 01: pack status — magic/version/counts/seal/practice +
+             * captured entries, as text (spec §7) */
+            static struct {
+                Header_t Header;
+                char Data[200];
+            } StatusReply;
+            uint16_t len = PACK_UART_BuildStatus(StatusReply.Data, sizeof(StatusReply.Data));
+            StatusReply.Header.ID = PACK_UART_STATUS_REPLY;
+            StatusReply.Header.Size = len;
+            SendReply(&StatusReply, (uint16_t)(sizeof(Header_t) + len));
+            break;
+        }
+#endif
+
         case 0x05DD: // reset
             #if defined(ENABLE_OVERLAY)
                 overlay_FLASH_RebootToBootloader();

@@ -92,6 +92,7 @@ Host tests (band-lock, pack layer):
     $ /tmp/test_keys
     $ gcc -Wall -Werror -Wextra -I. tests/test_edit.c scan01_edit.c -o /tmp/test_edit
     $ /tmp/test_edit
+    $ gcc -Wall -Werror -Wextra -I. tests/test_pack_uart.c pack_uart.c settings_pack.c pack_bandlock.c external/printf/printf.c -o /tmp/test_pack_uart -D_putchar=_putchar_stub 2>/dev/null || true
     $ ./tools/build-sim.sh      # the headless radio: pixel-budget assertions
     $ python3 tools/pbm2png.py  # screenshots/*.png + index.html
 

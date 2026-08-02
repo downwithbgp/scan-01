@@ -215,6 +215,7 @@ OBJS += main.o
 ifeq ($(EDITION_STRING),Scan01)
 OBJS += pack_bandlock.o
 OBJS += settings_pack.o
+OBJS += pack_uart.o
 OBJS += font_racing.o
 OBJS += font_racing_data.o
 OBJS += scan01_keys.o

@@ -213,6 +213,25 @@ uint16_t BK4819_GetRSSI(void)
     return 600;                             /* a strong signal: the bar shows */
 }
 
+/* the CSS tone decode: settable, so the CAPTURE tone path is testable */
+static BK4819_CssScanResult_t g_sim_css_result = BK4819_CSS_RESULT_NOT_FOUND;
+static uint32_t g_sim_cdcss_freq;
+static uint16_t g_sim_ctcss_freq;
+
+BK4819_CssScanResult_t BK4819_GetCxCSSScanResult(uint32_t *pCdcssFreq, uint16_t *pCtcssFreq)
+{
+    *pCdcssFreq = g_sim_cdcss_freq;
+    *pCtcssFreq = g_sim_ctcss_freq;
+    return g_sim_css_result;
+}
+
+void SIM_SetCssResult(BK4819_CssScanResult_t result, uint32_t cdcss, uint16_t ctcss)
+{
+    g_sim_css_result = result;
+    g_sim_cdcss_freq = cdcss;
+    g_sim_ctcss_freq = ctcss;
+}
+
 bool              gFmRadioMode;
 
 void FM_Start(void)
