@@ -1,7 +1,8 @@
 # P2 tasks — Scan engine (Scan 01 edition)
 
 Each task has a verification gate. Gates marked **(hw)** need real hardware in a
-real RF environment; **(bench)** gates need only two radios on a bench — the
+real RF environment; **(bench)** gates need only one radio + a conducted signal
+      source on a bench — the
 daily development loop (spec §12); everything else is build/review/host-test-able
 in this repo. Depends on P1 T3 (pack layer: `PackCar`/`PackStation` arrays,
 lockout bitmap) being in place.

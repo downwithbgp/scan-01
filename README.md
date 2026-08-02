@@ -133,7 +133,7 @@ flash gate.
 * There are no releases and no stable binary. Flashing today means
   building from source.
 * No hardware validation yet: the (hw) gates — real-glass screenshots,
-  the dump/flash round-trip, the two-radio bench tests, and the fan
+  the dump/flash round-trip, the bench tests (docs/bench-rig.md), and the fan
   hand-off — need a radio in a hand. Everything is host-verified;
   nothing has been turned on.
 * The receiver is a $25 wide-open front end. In a packed grandstand it
