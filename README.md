@@ -132,8 +132,9 @@ flash gate.
 
 ### Why shouldn't I use Scan 01 yet?
 
-* There are no releases and no stable binary. Flashing today means
-  building from source.
+* There are no releases and no stable binary — the CI `scan01-firmware`
+  artifact (or a local build) is the current one; testers: see the
+  [user testing guide](docs/user-testing.md).
 * No hardware validation yet: the (hw) gates — real-glass screenshots,
   the dump/flash round-trip, the bench tests (docs/bench-rig.md), and the fan
   hand-off — need a radio in a hand. Everything is host-verified;
@@ -171,6 +172,7 @@ egzumer → F4HWN). See [LICENSE](LICENSE) and [NOTICE](NOTICE).
 
 ### Documentation
 
+* [User testing guide](docs/user-testing.md) — streamlined directions for testers
 * [Design vision](docs/design/hci-vision.md) — the HCI reimagination
 * [P1 spec — pack format and EEPROM layout](spec/p1-pack-eeprom/spec.md)
 * [P2 spec — scan engine](spec/p2-scan-engine/spec.md)
