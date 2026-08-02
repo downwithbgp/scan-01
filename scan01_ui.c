@@ -31,6 +31,7 @@
 #include "radio.h"
 #include "scan01_edit.h"
 #include "scan01_keys.h"
+#include "scan01_scan.h"
 #include "settings.h"
 #include "settings_pack.h"
 #include "ui/helper.h"
@@ -203,8 +204,23 @@ static void StartScan(void)
         Flash("NO PACK");
         return;
     }
-    CHFRSCANNER_Start(true, SCAN_FWD);      /* true: Stop() restores the pre-scan channel */
+    /* the scan engine (P2): rebuild the universe + walk it */
+    uint8_t follow = 0xFF;
+    const char *driver = PACK_MyDriver();
+    if (driver != NULL && driver[0] != 0)
+        for (uint8_t i = 0; i < PACK_CarCount(); i++)
+            if (strcmp(PACK_GetCar(i)->number, driver) == 0) {
+                follow = i;
+                break;
+            }
+    SCAN01_SCAN_Rebuild(follow);
+    SCAN01_SCAN_Start();
     SetState(S1_ST_SCAN);
+}
+
+static void StopScan(void)
+{
+    SCAN01_SCAN_Stop();
 }
 
 static void TuneChannel(uint16_t channel)
@@ -787,7 +803,7 @@ void SCAN01_UI_ProcessKeys(KEY_Code_t key, bool bKeyPressed, bool bKeyHeld)
     switch (action) {
     case SCAN01_ACT_HOLD:                   /* PTT short in SCAN */
         if (PACK_IsValid()) {
-            CHFRSCANNER_Stop();
+            StopScan();                     /* the current channel stays tuned */
             SetState(S1_ST_HOLD);
         } else {
             Flash("NO PACK");
@@ -834,13 +850,13 @@ void SCAN01_UI_ProcessKeys(KEY_Code_t key, bool bKeyPressed, bool bKeyHeld)
     case SCAN01_ACT_HOME:                   /* long-EXIT: LIST in RACE mode */
         BrdTeardown();                      /* long-EXIT from BRD must clear the FM path */
         if (PACK_IsValid())
-            CHFRSCANNER_Stop();             /* browse is quiet */
+            StopScan();                     /* browse is quiet */
         g_list_sel = 0;
         SetState(S1_ST_LIST);
         break;
     case SCAN01_ACT_LIST:                   /* UP/DOWN in SCAN: open LIST */
         if (PACK_IsValid())
-            CHFRSCANNER_Stop();
+            StopScan();
         g_list_sel = 0;
         SetState(S1_ST_LIST);
         break;
@@ -925,9 +941,33 @@ void SCAN01_UI_ProcessKeys(KEY_Code_t key, bool bKeyPressed, bool bKeyHeld)
     case SCAN01_ACT_VOL_DOWN:
         VolumeChange(-1);
         break;
-    case SCAN01_ACT_GROUP:
-        Flash("GROUPS P2");
+    case SCAN01_ACT_GROUP: {                 /* F2: cycle the scan group */
+        SCAN01_SCAN_CycleGroup();
+        uint8_t follow = 0xFF;
+        const char *driver = PACK_MyDriver();
+        if (driver != NULL && driver[0] != 0)
+            for (uint8_t i = 0; i < PACK_CarCount(); i++)
+                if (strcmp(PACK_GetCar(i)->number, driver) == 0) {
+                    follow = i;
+                    break;
+                }
+        SCAN01_SCAN_Rebuild(follow);
+        const char *name = "ALL";
+        switch (SCAN01_SCAN_GetGroup()) {
+        case SCAN01_GROUP_A: name = "A"; break;
+        case SCAN01_GROUP_B: name = "B"; break;
+        case SCAN01_GROUP_C: name = "C"; break;
+        case SCAN01_GROUP_FAVS: name = "FAVS"; break;
+        default: break;
+        }
+        char msg[12];
+        snprintf(msg, sizeof(msg), "GROUP %s", name);
+        Flash(msg);
+        if (SCAN01_SCAN_Count() == 0)
+            Flash("NO CARS IN GROUP");
+        gUpdateDisplay = true;
         break;
+    }
     case SCAN01_ACT_SETUP:                  /* M short */
         if (g_st == S1_ST_LIST && g_list_sel < (int16_t)PACK_CarCount()) {
             EnterEdit();                    /* M on a LIST row = rename (vision §4.5) */
@@ -972,6 +1012,25 @@ void SCAN01_UI_ProcessKeys(KEY_Code_t key, bool bKeyPressed, bool bKeyHeld)
         HandleCommit(entry);
 }
 
+static void ScanEngineTick(void)
+{
+    const Scan01ScanEntry_t *entry = SCAN01_SCAN_GetCurrent();
+    bool tone_ok = true;
+
+    if (entry != NULL && entry->code_type == PACK_CT_CTCSS)
+        tone_ok = !g_CTCSS_Lost;
+    else if (entry != NULL && entry->code_type == PACK_CT_DCS)
+        tone_ok = !g_CDCSS_Lost;
+
+    Scan01ScanEvent_t ev = SCAN01_SCAN_Tick10ms(g_SquelchLost, tone_ok);
+    if (ev == SCAN01_SCAN_EV_ENTRY) {
+        const Scan01ScanEntry_t *cur = SCAN01_SCAN_GetCurrent();
+        if (cur != NULL)
+            TuneChannel(cur->channel);      /* the walk tunes its own entries */
+        gUpdateDisplay = true;
+    }
+}
+
 void SCAN01_UI_Tick10ms(void)
 {
     if (g_identity_10ms > 0) {
@@ -980,10 +1039,11 @@ void SCAN01_UI_Tick10ms(void)
             gUpdateDisplay = true;
         }
     }
-    if (!g_identity && g_st == S1_ST_SCAN && gScanStateDir == SCAN_OFF && PACK_IsValid())
-        StartScan();                        /* the SCAN state must actually scan; note this
-                                             * overrides SCAN_RESUME_MODE=0 (stop on carrier)
-                                             * — the edition always resumes scanning */
+    if (!g_identity && g_st == S1_ST_SCAN && SCAN01_SCAN_GetState() == SCAN01_SCAN_IDLE
+        && PACK_IsValid() && SCAN01_SCAN_Count() == 0)
+        StartScan();                        /* the SCAN state must actually scan */
+    if (g_st == S1_ST_SCAN || g_st == S1_ST_HOLD)
+        ScanEngineTick();
     if (g_flash_10ms > 0)
         if (--g_flash_10ms == 0)
             gUpdateDisplay = true;
@@ -1090,6 +1150,9 @@ static void RenderListen(void)
     } else if (PACK_IsPractice()) {
         DrawGlyph(5, 0, GLYPH_SCAN);
         PrintSmallAt(5, 9, "PRACTICE");
+    } else if (SCAN01_SCAN_Count() == 0) {
+        DrawGlyph(5, 0, GLYPH_SCAN);
+        PrintSmallAt(5, 9, "NO CARS IN GROUP");
     } else {
         DrawGlyph(5, 0, GLYPH_SCAN);
         PrintSmallAt(5, 9, "SCAN");

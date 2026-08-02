@@ -6,28 +6,28 @@ daily development loop (spec §12); everything else is build/review/host-test-ab
 in this repo. Depends on P1 T3 (pack layer: `PackCar`/`PackStation` arrays,
 lockout bitmap) being in place.
 
-## S1. Scan universe module (`scan_pack.c` / `scan_pack.h` — new)
-- [ ] Build the index list from the pack arrays: venue order, cars + non-broadcast
-      stations, exclude lockout + digital, apply group filter (ALL/A/B/C/FAVS).
-- [ ] Filter changes (F2, favorites, lockout) apply at cycle boundaries; rebuild is
-      O(n) and cheap. Empty-universe state per spec §3 (no hang, "NO CARS IN GROUP"
-      state line, capture still works).
-- **Gate:** build; **host unit tests** for the filter logic (pure function:
-      universe × filter × lockout → expected order, incl. empty-universe) in
-      `tests/` (P1 T8 harness); `/prop-test` on filter composition (group/venue/
-      lockout combinations).
+## S1. Scan universe module (`scan01_scan.c` — the engine's core) — DONE
+- [x] The engine (`scan01_scan.c/h` — pure, host-tested): the universe index list
+      (venue order, cars + non-broadcast non-digital stations, lockouts excluded,
+      group filter ALL/A/B/C/FAVS, the my-driver follow slot always included).
+- [x] Filter changes (F2) apply at the next cycle boundary (the walk position is
+      preserved across rebuilds); empty universe → EV_EMPTY + the "NO CARS IN GROUP"
+      state line; capture still works.
+- **Gate (PASS):** host tests in `tests/test_scan.c` — universe × group × lockout ×
+      follow, 2048 checks, 0 failures incl. a randomized 2000-tick invariant walk
+      (never stuck, follow gap ≤ 8, state in range).
 
-## S2. Cycle timing (dwell / hang / decode hold / debounce)
-- [ ] `SCAN_DWELL_10MS = 8` (80 ms — base comment: ≤ 60 ms misses signals,
-      chFrScanner.c:361), `SCAN_HANG_10MS = 25` (250 ms),
-      `SCAN_DECODE_HOLD_10MS = 20` (200 ms), `SCAN_UNMUTE_DEBOUNCE_10MS = 4`
-      (40 ms) as build-time constants; timer-driven 10 ms slice, same pattern as
-      `CHFRSCANNER`.
-- [ ] Base resume-mode machinery bypassed (fixed carrier-drop + hang); resume-menu
-      code compiled out of the edition.
-- **Gate:** build; timing logic reviewed against spec §4; **(bench)** UART debug output
-      of per-entry dwell timings with a second radio or signal generator; verify
-      ~80 ms/entry, the 200 ms decode hold, and the 250 ms hang.
+## S2. Cycle timing (dwell / hang / decode hold) — DONE
+- [x] `SCAN_DWELL_10MS = 8` (80 ms), `SCAN_HANG_10MS = 25` (250 ms),
+      `SCAN_DECODE_HOLD_10MS = 20` (200 ms) + the CSQ guard (500 ticks) and the
+      FOLLOW interleave (8) as build-time constants in `scan01_scan.h`; the
+      10 ms state machine (WALK → DECODE → LANDED → HANG) in the engine.
+- [x] The base's CHFRSCANNER resume machinery is bypassed — the engine's own
+      fixed carrier-drop + hang replaces it (the UI no longer calls
+      CHFRSCANNER_Start/Stop).
+- **Gate (PASS):** host tests pin the timing (dwell boundaries, decode hold,
+      hang, no-chop re-land); the sim walks real dwells. **(bench)** UART dwell
+      timing on two radios remains pending.
 
 ## S3. Landing & tone gate
 - [ ] Candidate = BK4819 squelch-open (base `FUNCTION_INCOMING` path); keep the

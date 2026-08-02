@@ -34,6 +34,8 @@ jobs:
         ./tools/build-golden.sh
         pip install -q pytest
         python3 -m pytest tests/test_packtool_*.py -q
+        gcc -Wall -Werror -Wextra -I. tests/test_scan.c scan01_scan.c settings_pack.c pack_bandlock.c -o /tmp/test_scan
+        /tmp/test_scan
         ./tools/build-sim.sh
         python3 tools/pbm2png.py
 

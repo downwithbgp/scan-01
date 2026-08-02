@@ -129,6 +129,16 @@ void UI_DisplayStatus(void)                 /* the strip is stubbed blank */
 
 bool              gMute;
 bool              gEnableSpeaker;
+bool              g_SquelchLost;          /* true = the squelch is OPEN (SQL lost) */
+bool              g_CTCSS_Lost = true;    /* tone not present by default */
+bool              g_CDCSS_Lost = true;
+
+void SIM_SetSignal(bool squelch_open, bool tone_ok)
+{
+    g_SquelchLost = squelch_open;
+    g_CTCSS_Lost = !tone_ok;
+    g_CDCSS_Lost = !tone_ok;
+}
 uint16_t          gBatteryVoltageAverage = 7800;
 uint16_t          gEEPROM_RSSI_CALIB[7][4];
 uint8_t           gUpdateStatus;

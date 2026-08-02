@@ -31,6 +31,7 @@
 #include "driver/st7565.h"
 #include "font_racing.h"
 #include "scan01_edit.h"
+#include "scan01_scan.h"
 #include "misc.h"
 #include "radio.h"
 #include "scan01_keys.h"
@@ -43,6 +44,7 @@ void SIM_EEPROM_Reset(void);
 void SIM_EEPROM_Poke(uint16_t address, const void *data, uint16_t size);
 void SIM_EEPROM_SetReadOnly(bool readonly);
 void SIM_SetCssResult(BK4819_CssScanResult_t result, uint32_t cdcss, uint16_t ctcss);
+void SIM_SetSignal(bool squelch_open, bool tone_ok);
 
 static int g_checks = 0;
 static int g_failures = 0;
@@ -293,6 +295,22 @@ int main(void)
         expect(c != NULL && strcmp(c->name, "NEW") == 0, "save: default name NEW");
     }
     SIM_SetCssResult(BK4819_CSS_RESULT_NOT_FOUND, 0, 0);
+
+    /* 9b. the scan engine: the walk lands on a tone'd signal. The earlier
+     * lockout scenario excluded car 24, so the walk is 29A, 8, 100, 3, 48 —
+     * after 4 dwells the signal opens on car 48 (ch 5). */
+    SCAN01_SCAN_JumpTo(0);                  /* deterministic walk start */
+    SIM_SetSignal(false, true);             /* a quiet band */
+    ticks(8 * 4);                           /* four dwells: pos 4 = car "48" */
+    SIM_SetSignal(true, true);              /* the car keys up with its tone */
+    ticks(SCAN_DECODE_HOLD_10MS + 1);       /* the decode hold (the first tick
+                                             * only transitions to DECODE) */
+    expect(SCAN01_SCAN_GetState() == SCAN01_SCAN_LANDED, "engine: landed on the signal");
+    shot("09b-scan-landed", true);
+    expect(gRxVfo->CHANNEL_SAVE == 5, "engine: tuned the signalling car (ch 5 = car 48)");
+    SIM_SetSignal(false, true);             /* unkeyed */
+    ticks(SCAN_HANG_10MS + 1);              /* the transition tick + the 25-tick hang */
+    expect(SCAN01_SCAN_GetState() == SCAN01_SCAN_WALK, "engine: resumed after the hang");
 
     /* 10. BRD */
     held(KEY_0);
