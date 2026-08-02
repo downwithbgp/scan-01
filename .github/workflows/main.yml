@@ -29,6 +29,7 @@ jobs:
         /tmp/test_keys
         gcc -Wall -Werror -Wextra -I. tests/test_edit.c scan01_edit.c -o /tmp/test_edit
         /tmp/test_edit
+        printf 'void _putchar(char c) { (void)c; }\n' > /tmp/putchar_stub.c
         gcc -Wall -Werror -Wextra -I. tests/test_pack_uart.c pack_uart.c settings_pack.c pack_bandlock.c external/printf/printf.c /tmp/putchar_stub.c -o /tmp/test_pack_uart
         /tmp/test_pack_uart
         ./tools/build-golden.sh
