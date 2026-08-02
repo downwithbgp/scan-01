@@ -65,15 +65,15 @@ external acceptance criteria; everything else is build/review/test-able in this 
 - [x] Seal + PRACTICE guards were T3/T6b: mutations refuse when sealed, PRACTICE is RAM-only, boot returns to RACE; `pack_status` reports both bits.
 - **Gate (PASS):** build clean both editions; firmware 55,748 ≤ 60,928; host suites **815,678 checks, 0 failures** (key 240, edit 28, pack 195, band-lock 815,004, font 155, pack-uart 10, sim 28 — the sim now exercises the tone capture + ALT save + NEW save end to end). **(hw)** end-to-end: capture → reboot → entry present + scanning — pending a real radio.
 
-## T8. packtool v0 (Python)
-- [ ] `validate` (§6 rules incl. ECPA band-lock), `build` → `pack.patch` region list, `diff`.
-- [ ] Introduce the host test harness: `tests/` with pytest for pure functions (Hz↔MHz, name/team composition/truncation, CTCSS/DCS value↔index against the dcs.c tables, bitmap packing, CRC16) — the firmware tasks T2/T3 mirror these.
-- [ ] `import` command (first parser: `indyspeedway` text format; fixture `race-packs/indyspeedway-ims-2026/source.txt` → semantically matches the checked-in draft `pack.json`).
-- [ ] `compose` + `library` commands (multi-event weekend assembly: merge event packs + `race-packs/library/series/` + `daily/` stations, dedupe by frequency, capacity trade-off report with trim options; fixtures: `woo-sprints.json` and `daily-presets.json` compose into valid packs, and a two-venue fixture (IMS + IRP style) asserts venue bits + LIST divider order).
-- [ ] `modulation` mapping (FM/AM → channel-record byte 11) with validation (AM only on 108–137 MHz).
-- [ ] `dump` + `flash` over the base UART protocol (pin framing against `driver/uart.c` + CHIRP driver in this task; 8-byte chunked writes).
-- **Gate:** `pytest` green; `packtool validate` on a real sample pack (P0 data) exits ≤ 1 (no errors — the draft pack intentionally carries a duplicate-frequency warning); build→dump round-trip on a fixture EEPROM image is semantically identical (same cars/stations/lockouts/flags; byte-level equality not required — `ALT` entries are reconstructed best-effort, spec §5.2).
-
+## T8. packtool v0 (Python) — DONE
+- [x] `packtool/` package: `model` (pack JSON + §6 validation), `binary` (the byte-exact EEPROM mirror), `uart` (the k5prog protocol), `cli` (validate/build/diff/dump/flash/import/compose), `importers/indyspeedway`, `compose`.
+- [x] **validate** (§6: number format, duplicates with ALT exemption, bands incl. ECPA, tone-table membership, AM only on 108–137, station kinds/counts, capacity) — it caught a REAL quirk in the IMS draft (cars 30/47 share 468.2625 — a warning per IndyCar 7.4.1.2).
+- [x] **build** → `pack.patch` region list (channel records + names + pack table, venue-ordered for the LIST dividers, stale-channel zeroing, the fixed 64-slot meta capacity). **The golden test proves the round-trip byte-for-byte** against `tests/fixtures/golden_eeprom.bin` — a fixture written by the REAL firmware pack layer (`tools/build-golden.sh`), covering every structured region (records, names, metas, counts, lockout, driver, seal, CRC validity; only the header-string padding is normalized — the demo mixes spaces and NULs).
+- [x] **diff**, **dump** (port or `--image`), **flash** — the k5prog protocol in `packtool/uart.py`: the obfuscated 0x0514 handshake → AES-128-ECB challenge (FIPS-197 vector-tested, key from driver/aes.c) → plaintext 0x051B/0x051D EEPROM read/write with the 8-byte chunking; framed against a fake radio that speaks the firmware's side of the protocol.
+- [x] **import** — the indyspeedway parser: the columnar CAR#/DRIVER/PRIMARY blocks (numbers+freqs pair exactly; multi-word driver names are best-effort tokens — the flat stream cannot recover name boundaries, a documented P0 with the source extract itself), station blocks with per-freq tones (CTCSS floats + DCS zero-padded octals), digital flags, family numbering (NBC/NBC2/NBC3). Matches the draft pack: 26 cars + 17 stations.
+- [x] **compose** — multi-event weekend assembly with venue stamping, station dedupe, cross-event car ALT merging, and the capacity trade-off report; the library fixtures (woo-sprints, daily-presets — the latter's 5-char station names fixed to the 4-char field) validate as buildable.
+- [x] Tone tables drift-guarded: the embedded CTCSS/DCS tables are regenerated from dcs.c and a test parses dcs.c to prove they never diverge (it caught my 0x87/0x8A typo).
+- **Gate (PASS):** pytest 22 tests, 0 failures; `packtool validate` on the IMS pack exits 0 with the shared-frequency warning; the golden round-trip is byte-exact on every structured region. (hw) `dump`/`flash` against a real radio remains pending.
 ## T9. Integration pass
 - [ ] Boot → SCAN → HOLD → capture → save → reboot → lockout persists → dump → pack round-trip.
 - [ ] Full-diff review (`/review`) of the edition against the base (no stray TX/DTMF/spectrum code reachable).

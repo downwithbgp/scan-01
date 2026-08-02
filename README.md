@@ -95,6 +95,13 @@ Host tests (band-lock, pack layer):
     $ gcc -Wall -Werror -Wextra -I. tests/test_pack_uart.c pack_uart.c settings_pack.c pack_bandlock.c external/printf/printf.c -o /tmp/test_pack_uart -D_putchar=_putchar_stub 2>/dev/null || true
     $ ./tools/build-sim.sh      # the headless radio: pixel-budget assertions
     $ python3 tools/pbm2png.py  # screenshots/*.png + index.html
+    $ ./tools/build-golden.sh   # regenerate the packtool's golden fixture
+    $ python3 -m pytest tests/test_packtool_*.py -q   # packtool (22 tests)
+
+The packtool (packtool/) turns community frequency data into firmware
+bytes: `python3 -m packtool.cli validate|build|diff|import|compose|dump|flash`.
+Its golden test proves the pack JSON <-> EEPROM round-trip byte-for-byte
+against a fixture written by the REAL firmware pack layer.
 
 The headless radio (tests/sim_radio.c + tests/sim_stubs.c) drives the REAL
 Scan 01 UI against stubbed hardware and asserts the pixel budgets the
