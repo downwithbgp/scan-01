@@ -31,6 +31,7 @@
 #include "radio.h"
 #include "scan01_edit.h"
 #include "scan01_keys.h"
+#include "scan01_lessons.h"
 #include "scan01_scan.h"
 #include "settings.h"
 #include "settings_pack.h"
@@ -799,12 +800,15 @@ void SCAN01_UI_ProcessKeys(KEY_Code_t key, bool bKeyPressed, bool bKeyHeld)
         gUpdateDisplay = true;
     }
 
+    SCAN01_LESSONS_KeyActivity();           /* any key ends the teach-idle */
+
     if (g_st == S1_ST_EDIT) {
         HandleEditKey(key, bKeyPressed, bKeyHeld);   /* the editor owns every key */
         return;
     }
 
     Scan01Action_t action = SCAN01_KEYS_ProcessKey(key, bKeyPressed, bKeyHeld);
+    SCAN01_LESSONS_MarkLearned(action);     /* performing a gesture teaches it */
 
     switch (action) {
     case SCAN01_ACT_HOLD:                   /* PTT short in SCAN */
@@ -1060,6 +1064,10 @@ void SCAN01_UI_Tick10ms(void)
     if (g_mute_10ms > 0)
         if (--g_mute_10ms == 0)
             MuteOff();                      /* the 10 s mute expires */
+    /* the fading legend: teach only in the SCAN state with a pack, never
+     * while typing, locked, or on the boot card */
+    SCAN01_LESSONS_Tick10ms(g_st == S1_ST_SCAN && !g_identity && !gEeprom.KEY_LOCK
+                            && !SCAN01_KEYS_IsTyping() && PACK_IsValid());
     SCAN01_EDIT_Tick10ms();                 /* the multi-tap same-key window */
     SCAN01_KEYS_Tick10ms();
 }
@@ -1153,25 +1161,31 @@ static void RenderListen(void)
     /* state line (or a flash) — left-aligned after the glyph */
     if (g_flash_10ms > 0) {
         PrintSmallAt(5, 9, g_flash);
-    } else if (g_st == S1_ST_HOLD) {
-        if (gEeprom.KEY_LOCK)
-            snprintf(state, sizeof(state), "HOLD %s LOCK", (car != NULL) ? car->number : (station != NULL ? station->name : ""));
-        else
-            snprintf(state, sizeof(state), "HOLD %s", (car != NULL) ? car->number : (station != NULL ? station->name : ""));
-        DrawGlyph(5, 0, GLYPH_HOLD);
-        PrintSmallAt(5, 9, state);
-    } else if (gEeprom.KEY_LOCK) {
-        DrawGlyph(5, 0, GLYPH_SCAN);
-        PrintSmallAt(5, 9, "KEYLOCK");
-    } else if (PACK_IsPractice()) {
-        DrawGlyph(5, 0, GLYPH_SCAN);
-        PrintSmallAt(5, 9, "PRACTICE");
-    } else if (SCAN01_SCAN_Count() == 0) {
-        DrawGlyph(5, 0, GLYPH_SCAN);
-        PrintSmallAt(5, 9, "NO CARS IN GROUP");
     } else {
-        DrawGlyph(5, 0, GLYPH_SCAN);
-        PrintSmallAt(5, 9, "SCAN");
+        const char *hint = SCAN01_LESSONS_CurrentHint();   /* one call: it may advance */
+        if (hint != NULL) {
+            DrawGlyph(5, 0, GLYPH_SCAN);
+            PrintSmallAt(5, 9, hint);
+        } else if (g_st == S1_ST_HOLD) {
+            if (gEeprom.KEY_LOCK)
+                snprintf(state, sizeof(state), "HOLD %s LOCK", (car != NULL) ? car->number : (station != NULL ? station->name : ""));
+            else
+                snprintf(state, sizeof(state), "HOLD %s", (car != NULL) ? car->number : (station != NULL ? station->name : ""));
+            DrawGlyph(5, 0, GLYPH_HOLD);
+            PrintSmallAt(5, 9, state);
+        } else if (gEeprom.KEY_LOCK) {
+            DrawGlyph(5, 0, GLYPH_SCAN);
+            PrintSmallAt(5, 9, "KEYLOCK");
+        } else if (PACK_IsPractice()) {
+            DrawGlyph(5, 0, GLYPH_SCAN);
+            PrintSmallAt(5, 9, "PRACTICE");
+        } else if (SCAN01_SCAN_Count() == 0) {
+            DrawGlyph(5, 0, GLYPH_SCAN);
+            PrintSmallAt(5, 9, "NO CARS IN GROUP");
+        } else {
+            DrawGlyph(5, 0, GLYPH_SCAN);
+            PrintSmallAt(5, 9, "SCAN");
+        }
     }
 
     ST7565_BlitFullScreen();
@@ -1418,6 +1432,7 @@ void SCAN01_UI_Init(void)
     g_setup_focus = 0;
     g_capture_tone_index = 0;
     g_capture_code_type = PACK_CT_NONE;
+    SCAN01_LESSONS_Init();
     if (PACK_IsDemo()) {
         /* factory-default boot: the demo pack was just installed — either a
          * fresh radio or a corrupted-pack recovery (PACK_Init resets g_demo

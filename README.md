@@ -101,11 +101,16 @@ Host tests (band-lock, pack layer):
     $ python3 tools/pbm2png.py  # screenshots/*.png + index.html
     $ gcc -Wall -Werror -Wextra -I. tests/test_scan.c scan01_scan.c settings_pack.c pack_bandlock.c -o /tmp/test_scan
     $ /tmp/test_scan            # the scan engine (2048 checks)
+    $ gcc -Wall -Werror -Wextra -I. tests/test_lessons.c scan01_lessons.c settings_pack.c pack_bandlock.c -o /tmp/test_lessons
+    $ /tmp/test_lessons         # the fading-legend lesson engine (31 checks)
     $ ./tools/build-golden.sh   # regenerate the packtool's golden fixture
-    $ python3 -m pytest tests/test_packtool_*.py -q   # packtool (22 tests)
+    $ python3 -m pytest tests/test_packtool_*.py -q   # packtool (48 tests)
 
 The packtool (packtool/) turns community frequency data into firmware
-bytes: `python3 -m packtool.cli validate|build|diff|import|compose|dump|flash`.
+bytes: `python3 -m packtool.cli validate|build|diff|import|compose|dump|flash|overlay`.
+The overlay prints the honest-face keypad sheet (`packtool overlay`);
+`build --teach` marks a pack so the radio teaches itself (the fading
+legend, scan01_lessons.c) instead of arriving quiet.
 Its golden test proves the pack JSON <-> EEPROM round-trip byte-for-byte
 against a fixture written by the REAL firmware pack layer.
 

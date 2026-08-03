@@ -18,6 +18,7 @@ DEFS="-DENABLE_FEAT_SCAN01 -DENABLE_FMRADIO -DENABLE_NOAA -DENABLE_UART \
 
 gcc -Wall -Werror -Wextra $DEFS -I. \
   tests/sim_radio.c tests/sim_stubs.c scan01_ui.c scan01_keys.c scan01_edit.c \
+  scan01_lessons.c \
   settings_pack.c pack_bandlock.c font_racing.c font_racing_data.c ui/helper.c \
   scan01_scan.c \
   external/printf/printf.c font.c dcs.c \

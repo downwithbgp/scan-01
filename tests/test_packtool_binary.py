@@ -157,3 +157,34 @@ def test_header_crc_convention():
     bad = bytearray(h)
     bad[0x10] ^= 0xFF
     assert not binary.header_valid(bytes(bad))
+
+
+def test_header_lessons_default_quiet():
+    """A real pack arrives quiet: without a lessons field the header marks
+    every lesson learned (0x7E) — the radio never teaches a veteran."""
+    h = binary.header(make_pack(), 4, 3)
+    assert h[0x39] & binary.LESSONS_MASK == binary.LESSONS_ALL
+    assert binary.header_valid(h)
+
+
+def test_header_lessons_teach_pack():
+    """--teach leaves the lessons unlearned: the radio explains itself."""
+    pack = make_pack()
+    pack.meta["lessons"] = 0
+    h = binary.header(pack, 4, 3)
+    assert h[0x39] & binary.LESSONS_MASK == 0
+    assert binary.header_valid(h)
+    # the seal and the lessons share the flags byte
+    pack.meta["sealed"] = True
+    h = binary.header(pack, 4, 3)
+    assert h[0x39] == 0x01
+    assert binary.header_valid(h)
+
+
+def test_parse_preserves_lessons():
+    """dump -> build roundtrip must carry the lesson bits exactly."""
+    pack = make_pack()
+    pack.meta["lessons"] = 0x10
+    h = binary.header(pack, 3, 3)
+    hi = binary.parse_header(h)
+    assert hi["lessons"] == 0x10

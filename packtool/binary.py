@@ -28,6 +28,9 @@ MAX_CARS = 64
 MAX_STATIONS = 24
 
 SEAL_FLAG = 0x01
+LESSONS_MASK = 0x7E          # bits 1-6 of the header flags: 1 = lesson learned
+LESSONS_ALL = 0x7E           # packtool default: a real pack arrives quiet
+                             # (meta["lessons"] = 0 → the radio teaches)
 ORIGIN_PACK, ORIGIN_CAPTURED, ORIGIN_MANUAL = 0, 1, 2
 
 
@@ -178,7 +181,8 @@ def header(pack: Pack, car_count: int, station_count: int) -> bytes:
     h[0x23:0x23 + 8] = bytes(bitmap)
     h[0x2B:0x2B + 4] = _trunc_nul(str(meta.get("driver", "")), 4)
     h[0x2F:0x2F + 8] = _trunc_nul(str(venue2), 8)
-    h[PACK_FLAGS_OFF] = SEAL_FLAG if meta.get("sealed") else 0
+    lessons = (meta.get("lessons", LESSONS_ALL) & LESSONS_MASK) if meta else LESSONS_ALL
+    h[PACK_FLAGS_OFF] = (SEAL_FLAG if meta.get("sealed") else 0) | lessons
     crc = crc16_ccitt(bytes(h[:PACK_CRC_LEN]))   # CRC field reads as zero
     h[PACK_CRC_OFF] = crc & 0xFF
     h[PACK_CRC_OFF + 1] = crc >> 8
@@ -205,6 +209,7 @@ def parse_header(h: bytes) -> dict:
         "driver": h[0x2B:0x2F].rstrip(b" \x00").decode("utf-8", "replace"),
         "venue2": h[0x2F:0x37].rstrip(b" \x00").decode("utf-8", "replace"),
         "sealed": bool(h[PACK_FLAGS_OFF] & SEAL_FLAG),
+        "lessons": h[PACK_FLAGS_OFF] & LESSONS_MASK,
     }
 
 
@@ -314,6 +319,7 @@ def parse(image: bytes, addr: int = 0) -> Pack:
         "series": hi["series"], "track": hi["track"], "session": hi["session"],
         "venues": [hi["track"], hi["venue2"]] if hi["venue2"] else [hi["track"]],
         "driver": hi["driver"], "sealed": hi["sealed"],
+        "lessons": hi["lessons"],
     }
     return Pack(meta=meta, cars=cars, stations=stations, lockouts=lockouts)
 

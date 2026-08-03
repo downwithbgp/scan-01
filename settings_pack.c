@@ -41,6 +41,11 @@ void EEPROM_WriteBuffer(uint16_t Address, const void *pBuffer);
 #define PACK_CRC_OFF        0x37u
 #define PACK_FLAGS_OFF      0x39u
 #define PACK_FLAG_SEALED    0x01u
+/* bits 1-6: the radio's lesson bitmap (scan01_lessons.c) — 1 = learned.
+ * Stored in the pack header so teaching state survives power cycles; the
+ * demo install clears it (fresh radio), packtool sets it all-learned by
+ * default (a real pack arrives quiet; `--teach` keeps it teaching). */
+#define PACK_LESSONS_MASK   0x7Eu
 #define PACK_MAGIC          { 'S', 'C', '0', '1' }
 #define PACK_VERSION        0x01u   /* exported via settings_pack.h */
 
@@ -55,6 +60,7 @@ static uint8_t        g_station_count;
 static bool           g_valid;
 static bool           g_demo;
 static bool           g_sealed;
+static uint8_t        g_lessons;          /* bits 1-6, 1 = lesson learned */
 static bool           g_practice;
 static char           g_series[9];
 static char           g_track[13];
@@ -94,7 +100,7 @@ static void header_serialize(uint8_t out[PACK_HEADER_SIZE])
     memcpy(out + 0x23, g_lockout, 8);
     memcpy(out + 0x2B, g_my_driver, 4);
     memcpy(out + 0x2F, g_venue2, 8);
-    out[PACK_FLAGS_OFF] = g_sealed ? PACK_FLAG_SEALED : 0;
+    out[PACK_FLAGS_OFF] = (g_sealed ? PACK_FLAG_SEALED : 0) | g_lessons;
     /* CRC over 0x00..0x39 with the CRC field itself read as zero (standard
      * checksum convention) — written last, over the real flags byte */
     uint16_t crc = PACK_Crc16Ccitt(out, PACK_CRC_LEN);
@@ -314,6 +320,7 @@ static void pack_install_demo(void)
     uint8_t n;
     memset(g_lockout, 0, 8);
     g_sealed = false;
+    g_lessons = 0;                      /* a fresh radio has everything to learn */
     g_car_count = 0;
     g_station_count = (uint8_t)DEMO_STATION_COUNT;
     strcpy(g_series, "SCAN01  ");
@@ -387,6 +394,7 @@ bool PACK_Load(void)
     load_strings(header);
     memcpy(g_lockout, header + 0x23, 8);
     g_sealed = (header[PACK_FLAGS_OFF] & PACK_FLAG_SEALED) != 0;
+    g_lessons = header[PACK_FLAGS_OFF] & PACK_LESSONS_MASK;
 
     for (i = 0; i < cars; i++) {
         PackCar_t *car = &g_cars[i];
@@ -557,6 +565,20 @@ bool PACK_SetSealed(bool sealed)
     if (!g_practice)
         header_commit();                    /* the flags byte is inside the CRC */
     return true;
+}
+
+uint8_t PACK_GetLessons(void)   { return g_lessons; }
+
+void PACK_SetLessons(uint8_t lessons)
+{
+    lessons &= PACK_LESSONS_MASK;
+    if (g_lessons == lessons || !g_valid)
+        return;
+    g_lessons = lessons;
+    if (!g_practice)
+        header_commit();                    /* teaching state is radio-owned; the
+                                             * seal never blocks it (it is not a
+                                             * pack mutation) */
 }
 
 bool PACK_RenameCar(uint8_t car_index, const char *name)

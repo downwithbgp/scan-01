@@ -84,6 +84,8 @@ bool     PACK_IsSealed(void);
 void     PACK_SetPractice(bool practice);
 bool     PACK_IsPractice(void);
 bool     PACK_SetSealed(bool sealed);
+uint8_t  PACK_GetLessons(void);             /* bits 1-6 of the header flags, 1 = learned */
+void     PACK_SetLessons(uint8_t lessons);  /* persists via the header CRC */
 bool     PACK_RenameCar(uint8_t car_index, const char *name);
 
 /* Accessors (consumed by the UI and the scan engine) */

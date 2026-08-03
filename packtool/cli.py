@@ -1,8 +1,10 @@
 # Scan 01 — packtool: the CLI
-"""validate / build / diff / dump / flash / import / compose.
+"""validate / build / diff / dump / flash / import / compose / overlay.
 
     packtool validate pack.json
     packtool build pack.json -o pack.patch        # region list for flashing
+    packtool build --teach pack.json              # a pack that teaches (lessons unlearned)
+    packtool overlay -o overlay.svg               # the honest-face keypad sheet
     packtool diff a.json b.json
     packtool dump --port /dev/ttyUSB0 -o pack.json
     packtool dump --image eeprom.bin -o pack.json # offline
@@ -21,6 +23,17 @@ from . import binary
 from .compose import compose_from_file
 from .importers.indyspeedway import import_text
 from .model import Pack, ValidationError, validate
+from .overlay import OVERLAY_SVG
+
+
+def cmd_overlay(args) -> int:
+    """Write the printable keypad overlay: the honest face of the radio —
+    plain digits where the moulded keypad prints ham jargon (BAND, VOX, ...),
+    HOLD on the PTT, MUTE/GROUP on the side keys, and the hold-glyph legend."""
+    with open(args.output, "w") as f:
+        f.write(OVERLAY_SVG)
+    print(f"wrote {args.output}: the honest-face overlay sheet")
+    return 0
 
 
 def cmd_validate(args) -> int:
@@ -46,6 +59,8 @@ def cmd_build(args) -> int:
         return 1
     for w in warnings:
         print(f"warning: {w.text}")
+    if args.teach:
+        pack.meta["lessons"] = 0        # a teaching pack: the radio explains itself
     regions = binary.build(pack)
     patch = {"meta": pack.meta,
              "regions": [{"addr": r.addr, "data": r.data.hex()} for r in regions]}
@@ -169,7 +184,13 @@ def main(argv=None) -> int:
     sp = sub.add_parser("build", help="build the EEPROM region list")
     sp.add_argument("pack")
     sp.add_argument("-o", "--output", default="pack.patch")
+    sp.add_argument("--teach", action="store_true",
+                    help="leave the lessons unlearned: the radio teaches itself")
     sp.set_defaults(fn=cmd_build)
+
+    sp = sub.add_parser("overlay", help="write the printable keypad overlay (SVG)")
+    sp.add_argument("-o", "--output", default="overlay.svg")
+    sp.set_defaults(fn=cmd_overlay)
 
     sp = sub.add_parser("diff", help="diff two pack JSONs")
     sp.add_argument("a")

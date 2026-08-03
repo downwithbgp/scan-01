@@ -31,6 +31,8 @@
 #include "driver/st7565.h"
 #include "font_racing.h"
 #include "scan01_edit.h"
+#include "scan01_keys.h"
+#include "scan01_lessons.h"
 #include "scan01_scan.h"
 #include "misc.h"
 #include "radio.h"
@@ -381,6 +383,64 @@ int main(void)
     held(KEY_MENU);                         /* ...hold → unlock */
     release_held(KEY_MENU);
     expect(!gEeprom.KEY_LOCK, "keylock: M held again clears KEY_LOCK, release keeps it off");
+
+    /* 12c. the fading legend: a fresh slate teaches one lesson at a time,
+     * each gesture learns its lesson, and the radio goes permanently quiet */
+    PACK_SetLessons(0);                     /* fresh radio: everything to learn */
+    SCAN01_LESSONS_Init();
+    ticks(600);                             /* 6 s idle */
+    render();
+    expect(strcmp(SCAN01_LESSONS_CurrentHint(), "PTT = HOLD") == 0,
+           "lessons: the hero lesson is the first hint");
+    expect(line_has_ink(6, 40, 90), "lessons: the hint renders in the state line");
+    shot("21-hint", true);
+
+    ptt_tap();                              /* PTT short → HOLD: lesson one */
+    key(KEY_STAR);
+    release(KEY_STAR);                      /* * short → SCAN (deferred from HOLD) */
+    ticks(600);
+    render();
+    expect(strcmp(SCAN01_LESSONS_CurrentHint(), "HOLD 5 = WX") == 0,
+           "lessons: the next hint is weather");
+    held(KEY_5);                            /* hold 5 → WX: lesson two */
+    expect((PACK_GetLessons() & LESSON_PACK_BIT(LESSON_HOLD5_WX)) != 0,
+           "lessons: WX is learned and persisted");
+    key(KEY_STAR);                          /* leave WX (immediate) */
+    ticks(600);
+    render();
+    expect(strcmp(SCAN01_LESSONS_CurrentHint(), "HOLD 0 = FM") == 0,
+           "lessons: next is FM");
+    held(KEY_0);                            /* hold 0 → BRD: lesson three */
+    key(KEY_STAR);                          /* leave BRD (immediate) */
+    ticks(600);
+    render();
+    expect(strcmp(SCAN01_LESSONS_CurrentHint(), "HOLD 9 = CALL") == 0,
+           "lessons: next is my driver");
+    held(KEY_9);                            /* hold 9 → the driver (24): lesson four */
+    key(KEY_STAR);
+    release(KEY_STAR);                      /* * short → SCAN (deferred from HOLD) */
+    ticks(600);
+    render();
+    expect(strcmp(SCAN01_LESSONS_CurrentHint(), "HOLD * = LOCK") == 0,
+           "lessons: next is lockout");
+    ptt_tap();                              /* HOLD the car */
+    held(KEY_STAR);                         /* hold * → lockout: lesson five */
+    key(KEY_STAR);
+    release(KEY_STAR);                      /* * short → SCAN (deferred from HOLD) */
+    ticks(600);
+    render();
+    expect(strcmp(SCAN01_LESSONS_CurrentHint(), "HOLD EXIT = HOME") == 0,
+           "lessons: the last lesson is home");
+    held(KEY_EXIT);                         /* long-EXIT → HOME: lesson six */
+    key(KEY_STAR);
+    release(KEY_STAR);                      /* * short → SCAN (deferred from LIST) */
+    expect(SCAN01_LESSONS_AllLearned(), "lessons: all six learned");
+    expect(PACK_GetLessons() == LESSON_PACK_ALL, "lessons: the header holds all bits");
+    ticks(600);
+    render();
+    expect(SCAN01_LESSONS_CurrentHint() == NULL, "lessons: the legend has faded");
+    expect(!line_has_ink(6, 40, 90), "lessons: the state line is quiet again");
+    shot("22-quiet", true);
 
     /* 13. NO PACK boot (a failing EEPROM: even the demo install fails) */
     SIM_EEPROM_Reset();

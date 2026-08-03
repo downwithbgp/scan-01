@@ -339,6 +339,17 @@ int main(void)
         expect(!PACK_IsSealed(), "seal: cleared");
         expect(PACK_AddCapture(&blocked), "seal: capture works again");
         expect(PACK_CarCount() == 1, "seal: capture added after unseal");
+        /* lessons share the flags byte with the seal: both survive together */
+        expect(PACK_GetLessons() == 0, "seal: lessons start clean");
+        PACK_SetLessons(0x7Eu);
+        expect(PACK_SetSealed(true), "seal: re-seal with lessons set");
+        memcpy(hdr, g_eeprom + 0x1BD0, 0x40);
+        expect((hdr[0x39] & 0x7Fu) == 0x7Fu, "seal: flags byte holds seal + lessons");
+        PACK_Init();                        /* reload: both bits survive */
+        expect(PACK_IsSealed(), "seal: sealed after reload");
+        expect(PACK_GetLessons() == 0x7Eu, "seal: lessons after reload");
+        PACK_SetLessons(0);
+        PACK_SetSealed(false);
     }
     expect(PACK_GetCar(0) != NULL, "rename: a car exists");
     expect(PACK_RenameCar(0, "HAMILTON L"), "rename: ok");

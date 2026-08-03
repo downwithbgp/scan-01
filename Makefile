@@ -220,6 +220,7 @@ OBJS += font_racing.o
 OBJS += font_racing_data.o
 OBJS += scan01_keys.o
 OBJS += scan01_edit.o
+OBJS += scan01_lessons.o
 OBJS += scan01_ui.o
 OBJS += scan01_scan.o
 endif
