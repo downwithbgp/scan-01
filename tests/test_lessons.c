@@ -186,6 +186,41 @@ static void test_silence_and_reset(void)
     expect(!SCAN01_LESSONS_AllLearned(), "L9: a fresh radio teaches again");
 }
 
+static void test_map_lifecycle(void)
+{
+    boot();
+    expect(!SCAN01_LESSONS_MapActive(), "M1: no map before the idle threshold");
+    ticks(600, true);
+    expect(SCAN01_LESSONS_MapActive(), "M1: the first teach-idle shows the map");
+    expect(SCAN01_LESSONS_CurrentHint() != NULL, "M1: the nudge is armed behind it");
+
+    /* any key dismisses the map for the rest of the boot */
+    SCAN01_LESSONS_KeyActivity();
+    expect(!SCAN01_LESSONS_MapActive(), "M2: a key dismisses the map");
+    ticks(1000, true);
+    expect(!SCAN01_LESSONS_MapActive(), "M2: the map never returns this boot");
+    expect(SCAN01_LESSONS_CurrentHint() != NULL, "M2: the nudges keep teaching");
+
+    /* a new boot earns one more map */
+    SCAN01_LESSONS_Init();
+    expect(!SCAN01_LESSONS_MapActive(), "M3: fresh boot: armed but not shown yet");
+    ticks(600, true);
+    expect(SCAN01_LESSONS_MapActive(), "M3: the next boot shows the map again");
+
+    /* all learned: no map, no nudges */
+    SCAN01_LESSONS_KeyActivity();
+    SCAN01_LESSONS_MarkLearned(SCAN01_ACT_HOLD);
+    SCAN01_LESSONS_MarkLearned(SCAN01_ACT_WX);
+    SCAN01_LESSONS_MarkLearned(SCAN01_ACT_BRD);
+    SCAN01_LESSONS_MarkLearned(SCAN01_ACT_MYDRIVER);
+    SCAN01_LESSONS_MarkLearned(SCAN01_ACT_LOCKOUT);
+    SCAN01_LESSONS_MarkLearned(SCAN01_ACT_HOME);
+    expect(SCAN01_LESSONS_AllLearned(), "M4: all learned");
+    ticks(10000, true);
+    expect(!SCAN01_LESSONS_MapActive(), "M4: a learned radio shows no map");
+    expect(SCAN01_LESSONS_CurrentHint() == NULL, "M4: and no nudges");
+}
+
 int main(void)
 {
     test_fresh_idle_and_hero_first();
@@ -193,6 +228,7 @@ int main(void)
     test_learning_and_persistence();
     test_key_activity_and_gating();
     test_silence_and_reset();
+    test_map_lifecycle();
 
     printf("lessons: %d checks, %d failures\n", g_checks, g_failures);
     return g_failures ? 1 : 0;

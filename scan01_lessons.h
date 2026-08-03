@@ -54,6 +54,9 @@ void         SCAN01_LESSONS_KeyActivity(void); /* any key event: idle resets, hi
 void         SCAN01_LESSONS_MarkLearned(Scan01Action_t action);
 bool         SCAN01_LESSONS_AllLearned(void);
 const char  *SCAN01_LESSONS_CurrentHint(void); /* NULL = silent */
+bool         SCAN01_LESSONS_MapActive(void);   /* the full-screen legend shows:
+                                                  first teach-idle of the boot only;
+                                                  after that the nudges take over */
 void         SCAN01_LESSONS_Tick10ms(bool can_teach);
 
 #endif /* SCAN01_LESSONS_H */

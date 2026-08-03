@@ -384,16 +384,31 @@ int main(void)
     release_held(KEY_MENU);
     expect(!gEeprom.KEY_LOCK, "keylock: M held again clears KEY_LOCK, release keeps it off");
 
-    /* 12c. the fading legend: a fresh slate teaches one lesson at a time,
-     * each gesture learns its lesson, and the radio goes permanently quiet */
+    /* 12c. the fading legend: fresh slate. The FIRST teach-idle shows the
+     * full-screen map (the whole legend at once); any key dismisses it and
+     * the one-line nudges take over; each gesture learns its lesson; all
+     * six learned → the radio goes permanently quiet */
     PACK_SetLessons(0);                     /* fresh radio: everything to learn */
     SCAN01_LESSONS_Init();
     ticks(600);                             /* 6 s idle */
     render();
+    expect(SCAN01_LESSONS_MapActive(), "map: the first teach-idle shows the map");
     expect(strcmp(SCAN01_LESSONS_CurrentHint(), "PTT = HOLD") == 0,
-           "lessons: the hero lesson is the first hint");
-    expect(line_has_ink(6, 40, 90), "lessons: the hint renders in the state line");
-    shot("21-hint", true);
+           "map: the hero nudge is armed behind it");
+    expect(line_has_ink(1, 0, 127), "map: row 0 renders the hero lesson");
+    expect(line_has_ink(7, 0, 127), "map: row 6 renders the footer hint");
+    expect(!line_has_ink(6, 120, 127), "map: the HOME row is not clipped at the right edge");
+    shot("21-map", true);
+
+    key(KEY_STAR);                          /* any key dismisses the map */
+    expect(!SCAN01_LESSONS_MapActive(), "map: a key dismisses it");
+    ticks(600);
+    render();
+    expect(!SCAN01_LESSONS_MapActive(), "map: never returns this boot");
+    expect(strcmp(SCAN01_LESSONS_CurrentHint(), "PTT = HOLD") == 0,
+           "lessons: the hero lesson is the first nudge");
+    expect(line_has_ink(6, 40, 90), "lessons: the nudge renders in the state line");
+    shot("22-hint", true);
 
     ptt_tap();                              /* PTT short → HOLD: lesson one */
     key(KEY_STAR);
@@ -439,8 +454,9 @@ int main(void)
     ticks(600);
     render();
     expect(SCAN01_LESSONS_CurrentHint() == NULL, "lessons: the legend has faded");
+    expect(!SCAN01_LESSONS_MapActive(), "lessons: no map either");
     expect(!line_has_ink(6, 40, 90), "lessons: the state line is quiet again");
-    shot("22-quiet", true);
+    shot("23-quiet", true);
 
     /* 13. NO PACK boot (a failing EEPROM: even the demo install fails) */
     SIM_EEPROM_Reset();

@@ -1037,11 +1037,11 @@ static void ScanEngineTick(void)
         tone_ok = !g_CDCSS_Lost;
 
     Scan01ScanEvent_t ev = SCAN01_SCAN_Tick10ms(g_SquelchLost, tone_ok);
-    if (ev == SCAN01_SCAN_EV_ENTRY) {
+    if (ev == SCAN01_SCAN_EV_ENTRY || ev == SCAN01_SCAN_EV_LANDED) {
         const Scan01ScanEntry_t *cur = SCAN01_SCAN_GetCurrent();
         if (cur != NULL)
             TuneChannel(cur->channel);      /* the walk tunes its own entries */
-        gUpdateDisplay = true;
+        gUpdateDisplay = true;              /* landing must clear the teach map */
     }
 }
 
@@ -1126,6 +1126,31 @@ static void DrawSignalBar(uint8_t level)
         gFrameBuffer[5][x] |= 0x1E;         /* 4 px tall, row 5 strip */
         gFrameBuffer[5][x + 1] |= 0x1E;
     }
+}
+
+/* The full-screen legend: every lesson at once, one row each — the whole
+ * keymap of the radio on one quiet screen (the first impression of the
+ * fading legend; the one-line nudges take over after the first key). */
+static void RenderTeachMap(void)
+{
+    static const char *const MAP[7] = {
+        "PTT = HOLD",
+        "HOLD 5 = WX",
+        "HOLD 0 = FM",
+        "HOLD 9 = CALL",
+        "HOLD * = LOCK",
+        "HOLD EXIT = HOME",
+        "TYPE A NUMBER",
+    };
+    uint8_t row;
+
+    UI_DisplayStatus();
+    UI_DisplayClear();
+
+    for (row = 0; row < 7; row++)
+        PrintSmall(row, MAP[row], true);
+
+    ST7565_BlitFullScreen();
 }
 
 static void RenderListen(void)
@@ -1386,6 +1411,14 @@ void UI_DisplayScan01(void)
 {
     if (g_identity) {
         RenderIdentity();
+        return;
+    }
+    /* the fading legend's first impression: the full-screen keymap while
+     * the walk is quiet — the number returns the moment audio lands */
+    if (g_st == S1_ST_SCAN && SCAN01_LESSONS_MapActive()
+        && (SCAN01_SCAN_GetState() == SCAN01_SCAN_WALK
+            || SCAN01_SCAN_GetState() == SCAN01_SCAN_IDLE)) {
+        RenderTeachMap();
         return;
     }
     switch (g_st) {

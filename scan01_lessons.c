@@ -43,6 +43,8 @@ static uint8_t   g_cursor;        /* the lesson currently on offer */
 static uint16_t  g_idle_10ms;
 static uint16_t  g_show_10ms;
 static bool      g_hinting;
+static bool      g_map_seen;      /* the full-screen map has shown this boot;
+                                     the one-line nudges take over from here */
 
 static bool LessonForAction(Scan01Action_t action, Scan01Lesson_t *lesson)
 {
@@ -94,6 +96,7 @@ void SCAN01_LESSONS_Init(void)
     g_idle_10ms = 0;
     g_show_10ms = 0;
     g_hinting = false;
+    g_map_seen = false;             /* every boot earns one full-screen map */
 }
 
 void SCAN01_LESSONS_KeyActivity(void)
@@ -101,6 +104,7 @@ void SCAN01_LESSONS_KeyActivity(void)
     g_idle_10ms = 0;
     g_hinting = false;
     g_show_10ms = 0;
+    g_map_seen = true;              /* the map is dismissed by any key */
 }
 
 void SCAN01_LESSONS_MarkLearned(Scan01Action_t action)
@@ -122,6 +126,11 @@ void SCAN01_LESSONS_MarkLearned(Scan01Action_t action)
 bool SCAN01_LESSONS_AllLearned(void)
 {
     return g_learned == LESSON_PACK_ALL;
+}
+
+bool SCAN01_LESSONS_MapActive(void)
+{
+    return g_hinting && !g_map_seen;
 }
 
 const char *SCAN01_LESSONS_CurrentHint(void)
