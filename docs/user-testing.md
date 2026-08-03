@@ -16,7 +16,8 @@ break the radio.
 - A Quansheng UV-K5 or UV-K6 (any K5-family clone).
 - A USB programming cable — Baofeng/Kenwood style, into the radio's SP/MIC
   jack (the same cable CHIRP uses).
-- A computer: Windows for flashing (the flasher GUI is Windows-only);
+- A computer with Chrome or Edge (the browser flasher works on Windows,
+  macOS, ChromeOS, and Linux — no cable drivers, no flashing software);
   the optional pack step needs Python 3.
 - The firmware binary `scan01.packed.bin` — from the **user-testing**
   release: <https://github.com/downwithbgp/scan-01/releases/tag/user-testing>
@@ -25,14 +26,25 @@ break the radio.
 
 ## Step 1 — Install the firmware (~5 min)
 
+**Easiest — flash from your browser** (Chrome/Edge, any OS):
+
 1. Radio **off**. Plug the cable into the SP/MIC jack and the PC.
-2. Run a UV-K5 flasher. The base firmware this edition is built from
-   documents **k5prog-win** (Windows GUI:
-   <https://github.com/OneOfEleven/k5prog-win>). It powers the radio on
-   and writes the flash; follow its port-selection instructions.
-3. Select `scan01.packed.bin` (the "packed" format is what the standard
-   upload tools require) and flash.
-4. Power-cycle the radio.
+2. Open the web flasher with the latest build pre-loaded:
+
+       https://egzumer.github.io/uvtools/?firmwareURL=https://github.com/downwithbgp/scan-01/releases/download/user-testing/scan01.packed.bin
+
+3. Click connect, pick the radio's COM port, and flash. The flasher
+   detects the boot label `Scan01 v0.1`; a CRC pass and a memory readout
+   around 95 % of 60 KB are normal for this edition.
+
+**Or the classic path** — **k5prog-win** (Windows GUI:
+<https://github.com/OneOfEleven/k5prog-win>; it powers the radio on and
+writes the flash — follow its port-selection instructions):
+
+1. Radio **off**. Plug the cable into the SP/MIC jack and the PC.
+2. Run k5prog-win and select `scan01.packed.bin` (the "packed" format is
+   what the standard upload tools require).
+3. Flash, then power-cycle the radio.
 
 A failed flash is recoverable — just run the flasher again.
 

@@ -263,6 +263,11 @@ ifeq ($(ENABLE_FEAT_F4HWN),1)
 	AUTHOR_STRING_2 ?= F4HWN
 	VERSION_STRING_2 ?= v4.3
 
+# the packed label (bootloader / web-flasher display): the F4HWN lineage
+# by default; the Scan01 edition overrides it with its own product version
+PACKED_NAME ?= $(AUTHOR_STRING_2)
+PACKED_VERSION ?= $(VERSION_STRING_2)
+
 	EDITION_STRING ?= Custom
 
 	AUTHOR_STRING ?= $(AUTHOR_STRING_1)+$(AUTHOR_STRING_2)
@@ -326,6 +331,10 @@ CFLAGS += -Wextra
 # ---- SCAN01 EDITION (must be after the 'CFLAGS =' reset) ----
 ifeq ($(EDITION_STRING),Scan01)
 	CFLAGS += -DENABLE_FEAT_SCAN01
+	# the packed label the bootloader and web flashers display — Scan 01's
+	# own product version (v0.1), not the F4HWN lineage's
+	PACKED_NAME := Scan01
+	PACKED_VERSION := v0.1
 endif
 
 CFLAGS += -DPRINTF_INCLUDE_CONFIG_H
@@ -572,7 +581,7 @@ else ifneq (,$(HAS_CRCMOD))
 	$(info )
 else
 ifeq ($(ENABLE_FEAT_F4HWN),1)
-	-$(MY_PYTHON) fw-pack.py $<.bin $(AUTHOR_STRING_2) $(VERSION_STRING_2) $<.packed.bin
+	-$(MY_PYTHON) fw-pack.py $<.bin $(PACKED_NAME) $(PACKED_VERSION) $<.packed.bin
 else
 	-$(MY_PYTHON) fw-pack.py $<.bin $(AUTHOR_STRING) $(VERSION_STRING) $<.packed.bin
 endif

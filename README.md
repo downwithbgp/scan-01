@@ -145,6 +145,19 @@ flash gate.
 * There are no stable releases yet — a rolling **user-testing**
   pre-release carries the latest build (rebuilt on every push); testers:
   see the [user testing guide](docs/user-testing.md).
+
+### Flash from your browser (no cable drivers, no flashing software)
+
+The easiest way to try a build: open the web flasher with the latest
+binary pre-loaded —
+
+    https://egzumer.github.io/uvtools/?firmwareURL=https://github.com/downwithbgp/scan-01/releases/download/user-testing/scan01.packed.bin
+
+Plug the radio into USB (it boots into its built-in flasher mode), pick
+the COM port, and flash. The flasher shows the boot label `Scan01 v0.1`.
+This flashes whatever the rolling **user-testing** release holds at that
+moment — always the newest push to main. The classic k5prog path is
+documented in the [user testing guide](docs/user-testing.md).
 * No hardware validation yet: the (hw) gates — real-glass screenshots,
   the dump/flash round-trip, the bench tests (docs/bench-rig.md), and the fan
   hand-off — need a radio in a hand. Everything is host-verified;
