@@ -56,9 +56,25 @@ Power on. You should see, in order:
    fresh radio — the built-in demo pack: airband guard 121.5, UNICOM 122.8,
    marine 16/9, FRS 1/7/14). Any key skips it.
 2. Straight into **SCAN**, no menus, no "press any key": the scan walks
-   the pack's channels and stops on any signal it finds.
+   the pack's channels and stops on any signal it finds. **The green LED
+   flashes whenever a signal is received** — on a fresh radio that's the
+   demo pack working (FRS/airband/marine traffic is everywhere in a city),
+   not an error.
 3. The bottom line is the state line: "SCAN", "HOLD", the group filter,
    or a transient message ("NO CAR 77", "BAND LOCKED", …).
+
+## Finding something with ▲▼
+
+The demo pack has **7 stations and 0 cars** — so the browse surfaces show
+stations, not race cars:
+
+- **HOLD + ▲▼** walks the stations one by one (each shows its name and
+  frequency).
+- **▲▼ in SCAN** opens the LIST — the full pack: cars first, then the
+  stations with their frequencies (the demo shows e.g. `GARD 121.5`).
+- Type a number and it jumps to that car — on the demo there are no car
+  numbers yet, so the radio answers `NO CAR …` until you capture one
+  (long-PTT).
 
 ## The key legend
 

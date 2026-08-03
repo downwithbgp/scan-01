@@ -483,6 +483,24 @@ int main(void)
     expect(!line_has_ink(7, 0, 127), "demo-map: no TYPE A NUMBER footer without cars");
     shot("24-demo-map", true);
 
+    /* 12e. the demo's content is browsable: HOLD + UP/DOWN walks the
+     * stations (the old car-only walk found nothing on a fresh radio),
+     * and the LIST shows the stations as rows with their frequencies */
+    key(KEY_STAR);                          /* dismiss the map */
+    ptt_tap();                              /* HOLD the station we're hearing */
+    uint16_t before = gRxVfo->CHANNEL_SAVE;
+    key(KEY_UP);                            /* HOLD: UP press = previous entry */
+    expect(gRxVfo->CHANNEL_SAVE != before, "browse: HOLD + UP moves between stations");
+    expect(gRxVfo->CHANNEL_SAVE >= 64, "browse: the walk stays in the stations (ch ≥ 64)");
+    key(KEY_STAR);
+    release(KEY_STAR);                      /* * short → SCAN (deferred from HOLD) */
+    key(KEY_UP);
+    release(KEY_UP);                        /* UP short → LIST */
+    render();
+    expect(line_has_ink(2, 20, 60), "browse: a station row shows its frequency");
+    expect(line_has_ink(7, 0, 60), "browse: the header counts the stations");
+    shot("25-demo-list", true);
+
     /* 13. NO PACK boot (a failing EEPROM: even the demo install fails) */
     SIM_EEPROM_Reset();
     SIM_EEPROM_SetReadOnly(true);

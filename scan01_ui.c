@@ -58,7 +58,7 @@ typedef enum {
 } S1State_t;
 
 static S1State_t g_st = S1_ST_SCAN;
-static int16_t   g_list_sel;          /* 0..PACK_CarCount(); == count = ＋ NEW row */
+static int16_t   g_list_sel;          /* 0..BrowseCount(); == count = ＋ NEW row */
 static uint32_t  g_capture_freq;      /* the frequency the CAPTURE form will save */
 static char      g_flash[15];         /* transient state-line message */
 static uint16_t  g_flash_10ms;
@@ -388,46 +388,112 @@ static void WxWalk(int8_t delta)
     TuneChannel((uint16_t)(NOAA_CHANNEL_FIRST + g_wx_channel));
 }
 
+/* ---- the browse universe: cars then non-broadcast stations — the LIST
+ * and the HOLD walk navigate the same pack world (vision §4.1: "LIST —
+ * the full pack as a scrollable list: car number + driver, stations …
+ * at the end"). Broadcast stations have no channel record (they live in
+ * the FM chip) and stay reachable via long-0. ---- */
+
+static uint8_t BrowseStationCount(void)
+{
+    uint8_t n = 0;
+    for (uint8_t i = 0; i < PACK_StationCount(); i++) {
+        const PackStation_t *st = PACK_GetStation(i);
+        if (st != NULL && st->channel != 0xFFFF)
+            n++;
+    }
+    return n;
+}
+
+static uint16_t BrowseCount(void)
+{
+    return (uint16_t)PACK_CarCount() + BrowseStationCount();
+}
+
+static bool BrowseGet(uint16_t index, const PackCar_t **car, const PackStation_t **station)
+{
+    uint8_t cars = PACK_CarCount();
+    if (index < cars) {
+        const PackCar_t *c = PACK_GetCar((uint8_t)index);
+        if (c != NULL) {
+            *car = c;
+            *station = NULL;
+            return true;
+        }
+        return false;
+    }
+    index -= cars;
+    for (uint8_t i = 0; i < PACK_StationCount(); i++) {
+        const PackStation_t *s = PACK_GetStation(i);
+        if (s == NULL || s->channel == 0xFFFF)
+            continue;
+        if (index-- == 0) {
+            *station = s;
+            *car = NULL;
+            return true;
+        }
+    }
+    return false;
+}
+
+static int16_t BrowseFindChannel(uint16_t channel)
+{
+    const PackCar_t *car;
+    const PackStation_t *station;
+    uint16_t count = BrowseCount();
+    for (uint16_t i = 0; i < count; i++)
+        if (BrowseGet(i, &car, &station)) {
+            uint16_t ch = (car != NULL) ? car->channel : station->channel;
+            if (ch == channel)
+                return (int16_t)i;
+        }
+    return -1;
+}
+
+static void BrowseTune(uint16_t index)
+{
+    const PackCar_t *car = NULL;
+    const PackStation_t *station = NULL;
+    if (BrowseGet(index, &car, &station)) {
+        if (car != NULL)
+            TuneChannel(car->channel);
+        else if (station != NULL)
+            TuneChannel(station->channel);
+    }
+}
+
 /* ---- LIST selection ---- */
 
 static void ListSelect(int16_t delta)
 {
-    int16_t count = (int16_t)PACK_CarCount();
+    int16_t count = (int16_t)BrowseCount();
     g_list_sel += delta;
     if (g_list_sel < 0)
         g_list_sel = count;                 /* wrap to the ＋ NEW row */
     if (g_list_sel > count)
         g_list_sel = 0;
-    if (g_list_sel < count) {
-        const PackCar_t *c = PACK_GetCar((uint8_t)g_list_sel);
-        if (c != NULL)
-            TuneChannel(c->channel);        /* LIST is a live browse surface */
-    }
+    if (g_list_sel < count)
+        BrowseTune((uint16_t)g_list_sel);   /* LIST is a live browse surface */
     gUpdateDisplay = true;
 }
 
 static void HoldWalk(int16_t delta)
 {
-    uint8_t count = PACK_CarCount();
+    uint16_t count = BrowseCount();
     if (count == 0) {
         Flash("NO CARS");
         return;
     }
-    uint16_t current = gRxVfo->CHANNEL_SAVE;
-    int16_t idx = -1;
-    for (uint8_t i = 0; i < count; i++)
-        if (PACK_GetCar(i)->channel == current) {
-            idx = (int16_t)i;
-            break;
-        }
+    int16_t idx = BrowseFindChannel(gRxVfo->CHANNEL_SAVE);
     if (idx < 0)
-        idx = (delta > 0) ? -1 : count;     /* start at the ends */
+        idx = (delta > 0) ? -1 : (int16_t)count;    /* start at the ends */
     idx += delta;
     if (idx < 0)
         idx = (int16_t)(count - 1);
     if (idx >= (int16_t)count)
         idx = 0;
-    TuneCar(PACK_GetCar((uint8_t)idx));
+    BrowseTune((uint16_t)idx);
+    SetState(S1_ST_HOLD);                   /* the walk keeps holding */
 }
 
 static void JumpFavorites(void)
@@ -833,8 +899,13 @@ void SCAN01_UI_ProcessKeys(KEY_Code_t key, bool bKeyPressed, bool bKeyHeld)
             ExitBrd();
             break;
         }
-        if (g_st == S1_ST_LIST && g_list_sel == (int16_t)PACK_CarCount()) {
+        if (g_st == S1_ST_LIST && g_list_sel == (int16_t)BrowseCount()) {
             /* ＋ NEW row is a button: the big button opens it */
+            if (gEeprom.KEY_LOCK) {
+                Flash("KEYLOCK");           /* a locked radio must not mutate the pack */
+                gUpdateDisplay = true;
+                break;
+            }
             g_capture_freq = gRxVfo->freq_config_RX.Frequency;
             TuneFreq(g_capture_freq);
             CaptureRefreshTone();
@@ -1238,7 +1309,7 @@ static void RenderListen(void)
 
 static void RenderList(void)
 {
-    uint8_t count = PACK_CarCount();
+    uint16_t count = BrowseCount();
     char num[4];
     char line[24];
 
@@ -1248,7 +1319,7 @@ static void RenderList(void)
     /* three 16 px rows: sel-1, sel, sel+1 (vision §5.4); selection inverted.
      * Clamp the window at the top so the selection sits in the FIRST block —
      * a selection floating in the middle at the list's top reads as broken. */
-    int16_t start = g_list_sel - 1;
+    int16_t start = (int16_t)g_list_sel - 1;
     if (start < 0)
         start = 0;
     for (int r = 0; r < 3; r++) {
@@ -1268,33 +1339,50 @@ static void RenderList(void)
             UI_PrintString("+ NEW", 0, 0, row, 7);
             continue;
         }
-        const PackCar_t *car = PACK_GetCar((uint8_t)idx);
-        if (car == NULL)
+        const PackCar_t *car = NULL;
+        const PackStation_t *station = NULL;
+        if (!BrowseGet((uint16_t)idx, &car, &station))
             continue;
-        strncpy(num, car->number, 3);
-        num[3] = 0;
-        UI_PrintString(num, 0, 0, row, 7);
-        /* venue divider: the first venue-1 row shows the second venue's name
-         * instead of the car name, with a rule above the row (spec §4.3) */
-        if (idx > 0) {
-            const PackCar_t *prev = PACK_GetCar((uint8_t)(idx - 1));
-            if (prev != NULL && prev->venue != car->venue) {
-                char div[15];
-                snprintf(div, sizeof(div), "- %s -", PACK_Venue2());
-                PrintSmallAt(row + 1, 20, div);
-                UI_DrawLineBuffer(gFrameBuffer, 20, (int16_t)((row) * 8), 127, (int16_t)((row) * 8), 1);
+        if (car != NULL) {
+            strncpy(num, car->number, 3);
+            num[3] = 0;
+            UI_PrintString(num, 0, 0, row, 7);
+            /* venue divider: the first venue-1 row shows the second venue's name
+             * instead of the car name, with a rule above the row (spec §4.3) */
+            if (idx > 0) {
+                const PackCar_t *prev = NULL;
+                const PackStation_t *prev_st = NULL;
+                if (BrowseGet((uint16_t)(idx - 1), &prev, &prev_st)
+                    && prev != NULL && prev->venue != car->venue) {
+                    char div[15];
+                    snprintf(div, sizeof(div), "- %s -", PACK_Venue2());
+                    PrintSmallAt(row + 1, 20, div);
+                    UI_DrawLineBuffer(gFrameBuffer, 20, (int16_t)((row) * 8), 127, (int16_t)((row) * 8), 1);
+                } else {
+                    PrintSmallAt(row + 1, 20, car->name);   /* wireframe: name only */
+                }
             } else {
-                PrintSmallAt(row + 1, 20, car->name);   /* wireframe: name only */
+                PrintSmallAt(row + 1, 20, car->name);
             }
+            if (CarLocked(car))
+                /* UI_DrawLineBuffer y is content-relative (0 = LCD row 8) */
+                UI_DrawLineBuffer(gFrameBuffer, 20, (int16_t)((row + 1) * 8), 127, (int16_t)((row + 1) * 8), 1);
         } else {
-            PrintSmallAt(row + 1, 20, car->name);
+            /* station row: name + frequency — the demo's stations are the
+             * content a fresh radio must be able to find */
+            char freq[12];
+            FormatFreq(freq, station->freq_hz);
+            UI_PrintString(station->name, 0, 0, row, 7);
+            PrintSmallAt(row + 1, 20, freq);
         }
-        if (CarLocked(car))
-            /* UI_DrawLineBuffer y is content-relative (0 = LCD row 8) */
-            UI_DrawLineBuffer(gFrameBuffer, 20, (int16_t)((row + 1) * 8), 127, (int16_t)((row + 1) * 8), 1);
     }
 
-    snprintf(line, sizeof(line), "%u cars · * lock", (unsigned)count);
+    uint8_t st_count = BrowseStationCount();
+    if (st_count > 0)
+        snprintf(line, sizeof(line), "%u cars · %u st", (unsigned)PACK_CarCount(),
+                 (unsigned)st_count);
+    else
+        snprintf(line, sizeof(line), "%u cars · * lock", (unsigned)PACK_CarCount());
     PrintSmall(6, line, false);
 
     ST7565_BlitFullScreen();
@@ -1485,6 +1573,9 @@ void SCAN01_UI_Init(void)
     g_setup_focus = 0;
     g_capture_tone_index = 0;
     g_capture_code_type = PACK_CT_NONE;
+    gEeprom.KEY_LOCK = false;               /* a scanner never boots locked — a
+                                             * stale lock from previous firmware
+                                             * would silently kill every key */
     SCAN01_LESSONS_Init();
     if (PACK_IsDemo()) {
         /* factory-default boot: the demo pack was just installed — either a
