@@ -34,6 +34,8 @@ jobs:
         /tmp/test_font
         gcc -Wall -Werror -Wextra -I. tests/test_keys.c scan01_keys.c -o /tmp/test_keys
         /tmp/test_keys
+        gcc -Wall -Werror -Wextra -I. tests/test_lessons.c scan01_lessons.c settings_pack.c pack_bandlock.c -o /tmp/test_lessons
+        /tmp/test_lessons
         gcc -Wall -Werror -Wextra -I. tests/test_edit.c scan01_edit.c -o /tmp/test_edit
         /tmp/test_edit
         printf 'void _putchar(char c) { (void)c; }\n' > /tmp/putchar_stub.c
