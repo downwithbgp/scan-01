@@ -384,10 +384,11 @@ int main(void)
     release_held(KEY_MENU);
     expect(!gEeprom.KEY_LOCK, "keylock: M held again clears KEY_LOCK, release keeps it off");
 
-    /* 12c. the fading legend: fresh slate. The FIRST teach-idle shows the
-     * full-screen map (the whole legend at once); any key dismisses it and
+    /* 12c. the fading legend: fresh slate on this pack (cars + driver, no
+     * broadcast presets). The FIRST teach-idle shows the full-screen map —
+     * only the six lessons this pack can fulfill; any key dismisses it and
      * the one-line nudges take over; each gesture learns its lesson; all
-     * six learned → the radio goes permanently quiet */
+     * learned → the radio goes permanently quiet */
     PACK_SetLessons(0);                     /* fresh radio: everything to learn */
     SCAN01_LESSONS_Init();
     ticks(600);                             /* 6 s idle */
@@ -397,7 +398,7 @@ int main(void)
            "map: the hero nudge is armed behind it");
     expect(line_has_ink(1, 0, 127), "map: row 0 renders the hero lesson");
     expect(line_has_ink(7, 0, 127), "map: row 6 renders the footer hint");
-    expect(!line_has_ink(6, 120, 127), "map: the HOME row is not clipped at the right edge");
+    expect(!line_has_ink(6, 120, 127), "map: the CATCH row is not clipped at the right edge");
     shot("21-map", true);
 
     key(KEY_STAR);                          /* any key dismisses the map */
@@ -423,15 +424,9 @@ int main(void)
     key(KEY_STAR);                          /* leave WX (immediate) */
     ticks(600);
     render();
-    expect(strcmp(SCAN01_LESSONS_CurrentHint(), "HOLD 0 = FM") == 0,
-           "lessons: next is FM");
-    held(KEY_0);                            /* hold 0 → BRD: lesson three */
-    key(KEY_STAR);                          /* leave BRD (immediate) */
-    ticks(600);
-    render();
     expect(strcmp(SCAN01_LESSONS_CurrentHint(), "HOLD 9 = CALL") == 0,
            "lessons: next is my driver");
-    held(KEY_9);                            /* hold 9 → the driver (24): lesson four */
+    held(KEY_9);                            /* hold 9 → the driver (24): lesson three */
     key(KEY_STAR);
     release(KEY_STAR);                      /* * short → SCAN (deferred from HOLD) */
     ticks(600);
@@ -439,24 +434,54 @@ int main(void)
     expect(strcmp(SCAN01_LESSONS_CurrentHint(), "HOLD * = LOCK") == 0,
            "lessons: next is lockout");
     ptt_tap();                              /* HOLD the car */
-    held(KEY_STAR);                         /* hold * → lockout: lesson five */
+    held(KEY_STAR);                         /* hold * → lockout: lesson four */
     key(KEY_STAR);
     release(KEY_STAR);                      /* * short → SCAN (deferred from HOLD) */
     ticks(600);
     render();
     expect(strcmp(SCAN01_LESSONS_CurrentHint(), "HOLD EXIT = HOME") == 0,
-           "lessons: the last lesson is home");
-    held(KEY_EXIT);                         /* long-EXIT → HOME: lesson six */
+           "lessons: next is home");
+    held(KEY_EXIT);                         /* long-EXIT → HOME: lesson five */
     key(KEY_STAR);
     release(KEY_STAR);                      /* * short → SCAN (deferred from LIST) */
+    ticks(600);
+    render();
+    expect(strcmp(SCAN01_LESSONS_CurrentHint(), "HOLD PTT = CATCH") == 0,
+           "lessons: the last lesson is catch");
+    ptt_hold();                             /* long-PTT → CAPTURE: lesson six */
+    key(KEY_STAR);                          /* leave CAPTURE */
     expect(SCAN01_LESSONS_AllLearned(), "lessons: all six learned");
-    expect(PACK_GetLessons() == LESSON_PACK_ALL, "lessons: the header holds all bits");
+    /* FM was never taught: this pack has no broadcast presets, so its bit
+     * stays clear while the teachable mask is what defines "learned" */
+    expect(PACK_GetLessons() == (LESSON_PACK_BIT(LESSON_PTT_HOLD)
+                                 | LESSON_PACK_BIT(LESSON_HOLD5_WX)
+                                 | LESSON_PACK_BIT(LESSON_HOLD9_CALL)
+                                 | LESSON_PACK_BIT(LESSON_HOLDSTAR_LOCK)
+                                 | LESSON_PACK_BIT(LESSON_HOLDEXIT_HOME)
+                                 | LESSON_PACK_BIT(LESSON_HOLDPTT_CATCH)),
+           "lessons: the header holds exactly the teachable bits");
     ticks(600);
     render();
     expect(SCAN01_LESSONS_CurrentHint() == NULL, "lessons: the legend has faded");
     expect(!SCAN01_LESSONS_MapActive(), "lessons: no map either");
     expect(!line_has_ink(6, 40, 90), "lessons: the state line is quiet again");
     shot("23-quiet", true);
+
+    /* 12d. the pure out-of-the-box view: a fresh EEPROM installs the demo
+     * pack (0 cars, no broadcast presets, no driver) — the map teaches
+     * exactly the four lessons the demo can fulfill, with no "TYPE A
+     * NUMBER" footer (the audit's core claim, rendered) */
+    SIM_EEPROM_Reset();
+    PACK_Init();
+    SCAN01_UI_Init();
+    ticks(680);                             /* 0.8 s identity + 6 s idle */
+    render();
+    expect(SCAN01_LESSONS_MapActive(), "demo-map: the first teach-idle shows the map");
+    expect(SCAN01_LESSONS_MapCount() == 4, "demo-map: the demo teaches four lessons");
+    expect(strcmp(SCAN01_LESSONS_MapText(0), "PTT = HOLD") == 0, "demo-map: hero first");
+    expect(strcmp(SCAN01_LESSONS_MapText(3), "HOLD PTT = CATCH") == 0, "demo-map: catch last");
+    expect(!line_has_ink(7, 0, 127), "demo-map: no TYPE A NUMBER footer without cars");
+    shot("24-demo-map", true);
 
     /* 13. NO PACK boot (a failing EEPROM: even the demo install fails) */
     SIM_EEPROM_Reset();
@@ -467,6 +492,11 @@ int main(void)
     expect(!PACK_IsValid(), "nopack: no valid pack");
     expect(line_has_ink(2, 30, 100) || line_has_ink(3, 30, 100),
            "nopack: the NO PACK line renders");
+    /* the identity card expires: the state line must tell the truth —
+     * "NO PACK", not the misleading "NO CARS IN GROUP" */
+    ticks(80);
+    render();
+    expect(line_has_ink(6, 40, 90), "nopack: the state line reads NO PACK");
 
     printf("sim: %d checks, %d failures\n", g_checks, g_failures);
     return g_failures ? 1 : 0;

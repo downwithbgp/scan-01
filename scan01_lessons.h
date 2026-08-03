@@ -42,12 +42,13 @@ typedef enum {
     LESSON_HOLD9_CALL,      /* hold 9 (printed CALL) = my driver */
     LESSON_HOLDSTAR_LOCK,   /* hold * in HOLD/LIST = lock the car out */
     LESSON_HOLDEXIT_HOME,   /* long-EXIT = HOME, the car browser */
+    LESSON_HOLDPTT_CATCH,   /* long-PTT = catch a signal from the air */
     LESSON_COUNT,
 } Scan01Lesson_t;
 
 /* The pack-header representation: 1 = learned, bit (lesson + 1). */
 #define LESSON_PACK_BIT(lesson) (uint8_t)(1u << ((lesson) + 1))
-#define LESSON_PACK_ALL        (uint8_t)(((1u << LESSON_COUNT) - 1) << 1) /* 0x7E */
+#define LESSON_PACK_ALL        (uint8_t)(((1u << LESSON_COUNT) - 1) << 1) /* 0xFE */
 
 void         SCAN01_LESSONS_Init(void);        /* read the pack's lesson flags */
 void         SCAN01_LESSONS_KeyActivity(void); /* any key event: idle resets, hint hides */
@@ -57,6 +58,8 @@ const char  *SCAN01_LESSONS_CurrentHint(void); /* NULL = silent */
 bool         SCAN01_LESSONS_MapActive(void);   /* the full-screen legend shows:
                                                   first teach-idle of the boot only;
                                                   after that the nudges take over */
+uint8_t      SCAN01_LESSONS_MapCount(void);    /* teachable lessons, in order */
+const char  *SCAN01_LESSONS_MapText(uint8_t row);
 void         SCAN01_LESSONS_Tick10ms(bool can_teach);
 
 #endif /* SCAN01_LESSONS_H */

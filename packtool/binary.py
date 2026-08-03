@@ -28,8 +28,8 @@ MAX_CARS = 64
 MAX_STATIONS = 24
 
 SEAL_FLAG = 0x01
-LESSONS_MASK = 0x7E          # bits 1-6 of the header flags: 1 = lesson learned
-LESSONS_ALL = 0x7E           # packtool default: a real pack arrives quiet
+LESSONS_MASK = 0xFE          # bits 1-7 of the header flags: 1 = lesson learned
+LESSONS_ALL = 0xFE           # packtool default: a real pack arrives quiet
                              # (meta["lessons"] = 0 → the radio teaches)
 ORIGIN_PACK, ORIGIN_CAPTURED, ORIGIN_MANUAL = 0, 1, 2
 

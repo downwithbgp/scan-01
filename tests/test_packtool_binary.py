@@ -161,7 +161,7 @@ def test_header_crc_convention():
 
 def test_header_lessons_default_quiet():
     """A real pack arrives quiet: without a lessons field the header marks
-    every lesson learned (0x7E) — the radio never teaches a veteran."""
+    every lesson learned (0xFE) — the radio never teaches a veteran."""
     h = binary.header(make_pack(), 4, 3)
     assert h[0x39] & binary.LESSONS_MASK == binary.LESSONS_ALL
     assert binary.header_valid(h)

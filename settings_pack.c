@@ -41,11 +41,11 @@ void EEPROM_WriteBuffer(uint16_t Address, const void *pBuffer);
 #define PACK_CRC_OFF        0x37u
 #define PACK_FLAGS_OFF      0x39u
 #define PACK_FLAG_SEALED    0x01u
-/* bits 1-6: the radio's lesson bitmap (scan01_lessons.c) — 1 = learned.
+/* bits 1-7: the radio's lesson bitmap (scan01_lessons.c) — 1 = learned.
  * Stored in the pack header so teaching state survives power cycles; the
  * demo install clears it (fresh radio), packtool sets it all-learned by
  * default (a real pack arrives quiet; `--teach` keeps it teaching). */
-#define PACK_LESSONS_MASK   0x7Eu
+#define PACK_LESSONS_MASK   0xFEu
 #define PACK_MAGIC          { 'S', 'C', '0', '1' }
 #define PACK_VERSION        0x01u   /* exported via settings_pack.h */
 

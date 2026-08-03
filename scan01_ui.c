@@ -329,7 +329,7 @@ static void EnterBrd(void)
         FM_Tune((uint16_t)(st->freq_hz / 100000u), 0, true);
     } else {
         FM_Tune(1011, 0, true);             /* 101.1 — a default that always exists */
-        Flash("NO PRESETS");
+        Flash("FM 101.1");                  /* name what actually happened */
     }
     SetState(S1_ST_BRD);
 }
@@ -922,6 +922,10 @@ void SCAN01_UI_ProcessKeys(KEY_Code_t key, bool bKeyPressed, bool bKeyHeld)
             bool locked = (bitmap[idx >> 3] & (1u << (idx & 7))) != 0;
             PACK_SaveLockout(idx, !locked);
             gUpdateDisplay = true;
+        } else {
+            /* the honest empty state: nothing here can be locked */
+            Flash(PACK_CarCount() == 0 ? "NO CARS" : "NO LOCK HERE");
+            gUpdateDisplay = true;
         }
         break;
     }
@@ -1128,35 +1132,39 @@ static void DrawSignalBar(uint8_t level)
     }
 }
 
-/* The full-screen legend: every lesson at once, one row each — the whole
- * keymap of the radio on one quiet screen (the first impression of the
- * fading legend; the one-line nudges take over after the first key). */
+/* The full-screen legend: every TEACHABLE lesson at once, one row each —
+ * the whole keymap of the radio on one quiet screen (the first impression
+ * of the fading legend; the one-line nudges take over after the first key).
+ * The map never advertises a gesture the loaded pack cannot fulfill. */
 static void RenderTeachMap(void)
 {
-    static const char *const MAP[7] = {
-        "PTT = HOLD",
-        "HOLD 5 = WX",
-        "HOLD 0 = FM",
-        "HOLD 9 = CALL",
-        "HOLD * = LOCK",
-        "HOLD EXIT = HOME",
-        "TYPE A NUMBER",
-    };
     uint8_t row;
+    uint8_t count = SCAN01_LESSONS_MapCount();
+    bool type = PACK_CarCount() > 0;        /* "TYPE A NUMBER" needs cars */
 
     UI_DisplayStatus();
     UI_DisplayClear();
 
-    for (row = 0; row < 7; row++)
-        PrintSmall(row, MAP[row], true);
+    for (row = 0; row < count; row++)
+        PrintSmall(row, SCAN01_LESSONS_MapText(row), true);
+    if (type)
+        PrintSmall(row, "TYPE A NUMBER", true);
 
     ST7565_BlitFullScreen();
 }
 
 static void RenderListen(void)
 {
-    const PackCar_t *car = CarByChannel(gRxVfo->CHANNEL_SAVE);
-    const PackStation_t *station = (car == NULL) ? StationByChannel(gRxVfo->CHANNEL_SAVE) : NULL;
+    /* without a valid pack the entry lookups would dereference NULL
+     * (PACK_GetCar/GetStation return NULL when !g_valid) — a dead-EEPROM
+     * radio must render, not crash */
+    const PackCar_t *car = NULL;
+    const PackStation_t *station = NULL;
+    if (PACK_IsValid()) {
+        car = CarByChannel(gRxVfo->CHANNEL_SAVE);
+        if (car == NULL)
+            station = StationByChannel(gRxVfo->CHANNEL_SAVE);
+    }
     char freq[16];
     char state[15];
 
@@ -1204,6 +1212,9 @@ static void RenderListen(void)
         } else if (PACK_IsPractice()) {
             DrawGlyph(5, 0, GLYPH_SCAN);
             PrintSmallAt(5, 9, "PRACTICE");
+        } else if (!PACK_IsValid()) {
+            DrawGlyph(5, 0, GLYPH_SCAN);
+            PrintSmallAt(5, 9, "NO PACK");
         } else if (SCAN01_SCAN_Count() == 0) {
             DrawGlyph(5, 0, GLYPH_SCAN);
             PrintSmallAt(5, 9, "NO CARS IN GROUP");
