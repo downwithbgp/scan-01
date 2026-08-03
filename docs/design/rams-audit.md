@@ -13,7 +13,7 @@ are the point.
 |---|---|---|---|---|
 | 1 | **Innovative** | Strong | Car number as the identity, not the frequency (vision §4); PTT repurposed → HOLD; capture-from-the-air (long-PTT, §4.5); label-honest keys (c1a61b7); open frequency data as the product (§6.2) | none needed — but innovation must stay invisible: a feature that needs explaining is a failure |
 | 2 | **Useful** | Good — unproven | Everything serves the race-day moment (vision §2); scan-first boot, WX/BRD one long-press away, lockout one gesture, FOLLOW; **the experience now starts at pack-load, not green flag — PRACTICE mode (airport aircraft band, daily-driver bands, ephemeral sandbox) and the seal make the radio survive the trip (vision §4.1)** | **P1 acceptance (hw):** a fan (not a ham) uses the radio for a full race without asking a question; **and** the same radio survives a week of kid play and boots to the intact weekend |
-| 3 | **Aesthetic** | **At risk** | Typographic system: 8/16/32 scale, one big thing per screen, whitespace as frame, no blinking (vision §5) — but the 32 px racing digits font **does not exist yet** and nothing has ever rendered | T4/T6: font + screens render; screenshots reviewed against the wireframes (hw) |
+| 3 | **Aesthetic** | Good — unproven | Typographic system: 8/16/32 scale, one big thing per screen, whitespace as frame, no blinking (vision §5); the 36-glyph racing font renders (T4) and `screenshots/` holds real captures of every screen | the screenshots need a human design-review pass against the wireframes (hw) — pixels render, taste is unproven |
 | 4 | **Understandable** | Good — unproven | Seven rules; no menus in the hot path; one function per key; the printed labels are the legend (vision §3) — the most-designed *and least-tested* principle | **P0 watch-fans** (don't interview — watch): hand a fan a loaded radio at the track, count questions. Natural venue: IRP, Saturday night |
 | 5 | **Unobtrusive** | Good — unproven | No beeps, no blinking, quiet status strip, radio disappears until needed, knob is always volume (vision §3) | P0/P1 (same watch-fans gate); also decide the key-click question *deliberately* — zero audio feedback is an assumption, not a finding |
 | 6 | **Honest** | Strong | RX-only, period (§7); no "PRO" branding; RF limits stated, not hidden (§13.1); `origin`/`verified` flags on every entry; unconfirmed library channels honestly flagged; the RE market claim is quoted, not hyped; digital feeds flagged and skipped (65c5d68) | T9: every release build audited for TX reachability — compiled out must mean unreachable |
@@ -32,9 +32,10 @@ are the point.
   P0/P1 gates test, and the natural venue is now local: **IRP on a Saturday night**
   (user context: Marion County, IN — a real bullring without needing a big race
   weekend).
-- **Behind (3):** aesthetic is the only genuinely lagging principle. The type system
-  is designed on paper; the 36-glyph font and the screens must render before the
-  design can be judged — or improved.
+- **Rendered but unjudged (3):** aesthetic is no longer the laggard — the
+  36-glyph font and every screen of the vision render (`screenshots/`), but no
+  human has reviewed them. The gate is a design-review pass of the screenshots
+  against the wireframes, not more code.
 
 ## The deletion test (for every future feature)
 

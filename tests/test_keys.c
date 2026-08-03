@@ -98,17 +98,20 @@ static void test_scan_matrix(void)
     expect_action(held(KEY_1), SCAN01_ACT_NONE, "SCAN: 1 held → nothing (no label)");
     expect_action(held(KEY_STAR), SCAN01_ACT_NONE, "SCAN: * held → nothing (no car to lock)");
 
-    /* navigation */
-    expect_action(press(KEY_UP), SCAN01_ACT_LIST, "SCAN: UP → LIST");
+    /* navigation: a tap opens LIST on release; a hold is the volume control */
+    expect_action(press(KEY_UP), SCAN01_ACT_NONE, "SCAN: UP press deferred");
+    expect_action(release(KEY_UP), SCAN01_ACT_LIST, "SCAN: UP short → LIST");
     expect_action(held(KEY_UP), SCAN01_ACT_VOL_UP, "SCAN: held UP → volume up");
     expect_action(held(KEY_DOWN), SCAN01_ACT_VOL_DOWN, "SCAN: held DOWN → volume down");
-    expect_action(press(KEY_DOWN), SCAN01_ACT_LIST, "SCAN: DOWN → LIST");
+    expect_action(press(KEY_DOWN), SCAN01_ACT_NONE, "SCAN: DOWN press deferred");
+    expect_action(release(KEY_DOWN), SCAN01_ACT_LIST, "SCAN: DOWN short → LIST");
     expect_action(press(KEY_STAR), SCAN01_ACT_SCAN, "SCAN: * short → SCAN (no-op)");
     expect_action(press(KEY_F), SCAN01_ACT_FAVORITES, "SCAN: # → favorites");
     expect_action(press(KEY_SIDE1), SCAN01_ACT_MUTE, "SCAN: F1 → mute");
     expect_action(held(KEY_SIDE1), SCAN01_ACT_MUTE_TOGGLE, "SCAN: F1 held → mute toggle");
     expect_action(press(KEY_SIDE2), SCAN01_ACT_GROUP, "SCAN: F2 → group cycle");
-    expect_action(press(KEY_MENU), SCAN01_ACT_SETUP, "SCAN: M → SETUP");
+    expect_action(press(KEY_MENU), SCAN01_ACT_NONE, "SCAN: M press deferred");
+    expect_action(release(KEY_MENU), SCAN01_ACT_SETUP, "SCAN: M short → SETUP");
     expect_action(held(KEY_MENU), SCAN01_ACT_KEYLOCK, "SCAN: M held → keylock");
     expect_action(press(KEY_EXIT), SCAN01_ACT_NONE, "SCAN: EXIT → no-op");
     expect_action(held(KEY_EXIT), SCAN01_ACT_HOME, "SCAN: EXIT held → HOME");
@@ -131,7 +134,8 @@ static void test_hold_matrix(void)
     expect_action(held(KEY_UP), SCAN01_ACT_VOL_UP, "HOLD: held UP → volume up");
     expect_action(held(KEY_DOWN), SCAN01_ACT_VOL_DOWN, "HOLD: held DOWN → volume down");
     expect_action(press(KEY_DOWN), SCAN01_ACT_NAV_DOWN, "HOLD: DOWN → next car");
-    expect_action(press(KEY_STAR), SCAN01_ACT_SCAN, "HOLD: * short → SCAN");
+    expect_action(press(KEY_STAR), SCAN01_ACT_NONE, "HOLD: * press deferred");
+    expect_action(release(KEY_STAR), SCAN01_ACT_SCAN, "HOLD: * short → SCAN");
     expect_action(held(KEY_STAR), SCAN01_ACT_LOCKOUT, "HOLD: * held → lockout");
     expect_action(press(KEY_EXIT), SCAN01_ACT_SCAN, "HOLD: EXIT → SCAN");
     expect_action(held(KEY_EXIT), SCAN01_ACT_HOME, "HOLD: EXIT held → HOME");
@@ -155,11 +159,13 @@ static void test_list_matrix(void)
     expect_action(press(KEY_DOWN), SCAN01_ACT_NAV_DOWN, "LIST: DOWN scrolls");
     expect_action(held(KEY_UP), SCAN01_ACT_NAV_UP, "LIST: UP held scrolls (not volume)");
     expect_action(held(KEY_DOWN), SCAN01_ACT_NAV_DOWN, "LIST: DOWN held scrolls");
-    expect_action(press(KEY_STAR), SCAN01_ACT_SCAN, "LIST: * short → SCAN");
+    expect_action(press(KEY_STAR), SCAN01_ACT_NONE, "LIST: * press deferred");
+    expect_action(release(KEY_STAR), SCAN01_ACT_SCAN, "LIST: * short → SCAN");
     expect_action(held(KEY_STAR), SCAN01_ACT_LOCKOUT, "LIST: * held → lockout selected");
     expect_action(press(KEY_EXIT), SCAN01_ACT_SCAN, "LIST: EXIT → SCAN");
     expect_action(held(KEY_EXIT), SCAN01_ACT_HOME, "LIST: EXIT held → HOME");
-    expect_action(press(KEY_MENU), SCAN01_ACT_SETUP, "LIST: M → SETUP");
+    expect_action(press(KEY_MENU), SCAN01_ACT_NONE, "LIST: M press deferred");
+    expect_action(release(KEY_MENU), SCAN01_ACT_SETUP, "LIST: M short → SETUP");
     expect_action(press(KEY_SIDE2), SCAN01_ACT_GROUP, "LIST: F2 → group cycle");
     expect_action(press(KEY_F), SCAN01_ACT_FAVORITES, "LIST: # → favorites");
 }
@@ -398,7 +404,8 @@ static void test_typing_conflicts(void)
     reset();
     type_key('3');
     type_key('3');
-    expect_action(press(KEY_MENU), SCAN01_ACT_SETUP, "CONFLICT: M abandons entry → SETUP");
+    expect_action(press(KEY_MENU), SCAN01_ACT_NONE, "CONFLICT: M press deferred mid-entry");
+    expect_action(release(KEY_MENU), SCAN01_ACT_SETUP, "CONFLICT: M short abandons entry → SETUP");
     reset();
     type_key('3');
     expect_action(press(KEY_SIDE2), SCAN01_ACT_GROUP, "CONFLICT: F2 abandons entry → GROUP");
@@ -438,13 +445,85 @@ static void test_typing_conflicts(void)
     expect(strcmp(SCAN01_TYPE_GetBuffer(), "2B") == 0, "CONFLICT: '2B'");
 }
 
+/* ---- the real press → held → release chain (the base delivers all three;
+ * releases must never re-fire the press or held action) ---- */
+
+static void test_deferred_gestures(void)
+{
+    /* M: a tap opens SETUP on release; a hold locks on the held event; the
+     * release after the hold is consumed — no self-cancelling lock */
+    reset();
+    expect_action(press(KEY_MENU), SCAN01_ACT_NONE, "GESTURE: M press deferred");
+    expect_action(release(KEY_MENU), SCAN01_ACT_SETUP, "GESTURE: M short → SETUP on release");
+
+    reset();
+    expect_action(press(KEY_MENU), SCAN01_ACT_NONE, "GESTURE: M press (2)");
+    expect_action(held(KEY_MENU), SCAN01_ACT_KEYLOCK, "GESTURE: M held → KEYLOCK");
+    expect_action(release(KEY_MENU), SCAN01_ACT_NONE, "GESTURE: M release after hold consumed");
+
+    /* * in HOLD: a tap resumes on release; a hold locks out */
+    reset();
+    SCAN01_KEYS_SetUiState(SCAN01_UI_HOLD);
+    expect_action(press(KEY_STAR), SCAN01_ACT_NONE, "GESTURE: * press deferred in HOLD");
+    expect_action(release(KEY_STAR), SCAN01_ACT_SCAN, "GESTURE: * short → SCAN on release");
+
+    reset();
+    SCAN01_KEYS_SetUiState(SCAN01_UI_HOLD);
+    expect_action(press(KEY_STAR), SCAN01_ACT_NONE, "GESTURE: * press (2)");
+    expect_action(held(KEY_STAR), SCAN01_ACT_LOCKOUT, "GESTURE: * held → LOCKOUT");
+    expect_action(release(KEY_STAR), SCAN01_ACT_NONE, "GESTURE: * release after hold consumed");
+
+    /* UP in SCAN: a tap opens LIST on release; a hold is the volume control */
+    reset();
+    expect_action(press(KEY_UP), SCAN01_ACT_NONE, "GESTURE: UP press deferred in SCAN");
+    expect_action(held(KEY_UP), SCAN01_ACT_VOL_UP, "GESTURE: UP held → volume");
+    expect_action(release(KEY_UP), SCAN01_ACT_NONE, "GESTURE: UP release after hold consumed");
+
+    reset();
+    expect_action(press(KEY_UP), SCAN01_ACT_NONE, "GESTURE: UP press (2)");
+    expect_action(release(KEY_UP), SCAN01_ACT_LIST, "GESTURE: UP short → LIST on release");
+
+    /* a digit tap must not double-type: the release is consumed */
+    reset();
+    expect_action(press(KEY_2), SCAN01_ACT_TYPE_UPDATE, "GESTURE: digit press types");
+    expect_action(release(KEY_2), SCAN01_ACT_NONE, "GESTURE: digit release consumed");
+    expect(strcmp(SCAN01_TYPE_GetBuffer(), "2") == 0, "GESTURE: buffer '2' after the full tap");
+
+    /* a label hold: press types, held labels, release consumed */
+    reset();
+    expect_action(press(KEY_0), SCAN01_ACT_TYPE_UPDATE, "GESTURE: 0 press types");
+    expect_action(held(KEY_0), SCAN01_ACT_BRD, "GESTURE: 0 held → BRD");
+    expect_action(release(KEY_0), SCAN01_ACT_NONE, "GESTURE: 0 release consumed");
+
+    /* another key cancels a deferred press */
+    reset();
+    expect_action(press(KEY_MENU), SCAN01_ACT_NONE, "GESTURE: M press deferred (3)");
+    expect_action(press(KEY_5), SCAN01_ACT_TYPE_UPDATE, "GESTURE: 5 press cancels the deferral");
+    expect_action(release(KEY_MENU), SCAN01_ACT_NONE, "GESTURE: M release after 5 is nothing");
+    expect(strcmp(SCAN01_TYPE_GetBuffer(), "5") == 0, "GESTURE: only the 5 was typed");
+
+    /* a state change aborts the deferred press (SetUiState clears it) */
+    reset();
+    expect_action(press(KEY_MENU), SCAN01_ACT_NONE, "GESTURE: M press deferred (4)");
+    SCAN01_KEYS_SetUiState(SCAN01_UI_HOLD);
+    expect_action(release(KEY_MENU), SCAN01_ACT_NONE, "GESTURE: M release after state change is nothing");
+
+    /* a PTT press aborts the deferred press */
+    reset();
+    expect_action(press(KEY_MENU), SCAN01_ACT_NONE, "GESTURE: M press deferred (5)");
+    expect_action(press(KEY_PTT), SCAN01_ACT_NONE, "GESTURE: PTT press cancels the deferral");
+    expect_action(release(KEY_MENU), SCAN01_ACT_NONE, "GESTURE: M release after PTT is nothing");
+    expect_action(release(KEY_PTT), SCAN01_ACT_HOLD, "GESTURE: the PTT tap still resolves");
+}
+
 static void test_state_transitions(void)
 {
     /* entering a non-listening state aborts a pending entry and hold timer */
     reset();
     type_key('9');
-    expect_action(press(KEY_MENU), SCAN01_ACT_SETUP, "STATE: M mid-entry");
-    expect(!SCAN01_KEYS_IsTyping(), "STATE: entry cleared on SETUP");
+    expect_action(press(KEY_MENU), SCAN01_ACT_NONE, "STATE: M press deferred mid-entry");
+    expect(!SCAN01_KEYS_IsTyping(), "STATE: entry cleared on M press");
+    expect_action(release(KEY_MENU), SCAN01_ACT_SETUP, "STATE: M short → SETUP");
 
     /* entering CAPTURE clears any pending entry */
     reset();
@@ -492,6 +571,7 @@ int main(void)
     test_typing_number();
     test_typing_freq();
     test_typing_conflicts();
+    test_deferred_gestures();
     test_state_transitions();
 
     printf("key layer: %d checks, %d failures\n", g_checks, g_failures);

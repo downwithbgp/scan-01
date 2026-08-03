@@ -60,6 +60,7 @@ static void expect(bool cond, const char *what)
 
 static void key(KEY_Code_t k) { SCAN01_UI_ProcessKeys(k, true, false); }
 static void release(KEY_Code_t k) { SCAN01_UI_ProcessKeys(k, false, false); }
+static void release_held(KEY_Code_t k) { SCAN01_UI_ProcessKeys(k, false, true); }
 static void held(KEY_Code_t k) { SCAN01_UI_ProcessKeys(k, true, true); }
 
 static void ticks(int n)
@@ -71,7 +72,7 @@ static void ticks(int n)
 static void ptt_tap(void) { key(KEY_PTT); release(KEY_PTT); }
 static void ptt_hold(void) { key(KEY_PTT); ticks(80); release(KEY_PTT); }
 
-static void digit(char d) { key(KEY_0 + (d - '0')); }
+static void digit(char d) { key(KEY_0 + (d - '0')); release(KEY_0 + (d - '0')); }
 
 static void render(void) { UI_DisplayScan01(); }
 
@@ -221,7 +222,9 @@ int main(void)
 
     /* 5. LIST with the selection on car 0 (* = the printed SCAN label) */
     key(KEY_STAR);
+    release(KEY_STAR);                      /* * short → SCAN */
     key(KEY_UP);
+    release(KEY_UP);                        /* UP short → LIST */
     shot("05-list", true);
     {
         int inv = 0;
@@ -328,6 +331,7 @@ int main(void)
     /* 11. SETUP pages */
     key(KEY_STAR);
     key(KEY_MENU);
+    release(KEY_MENU);                      /* M short → SETUP */
     shot("13-setup-pack", true);
     key(KEY_MENU);
     shot("14-setup-audio", true);
@@ -340,7 +344,9 @@ int main(void)
     /* 12. the name editor: LIST → M on car 0 → type BYRON */
     ticks(80);
     key(KEY_UP);
+    release(KEY_UP);                        /* UP short → LIST */
     key(KEY_MENU);
+    release(KEY_MENU);                      /* M short → SETUP → the editor */
     shot("17-edit-empty", true);
     digit('2'); digit('2');                 /* B */
     digit('9'); digit('9'); digit('9');     /* Y */
@@ -351,12 +357,37 @@ int main(void)
     shot("18-edit-byron", true);
     expect(strcmp(SCAN01_EDIT_GetBuffer(), "BYRON") == 0, "edit: multi-tap types BYRON");
 
+    /* 12b. key lock: PTT saves → LIST, `*` short → SCAN, then the real
+     * press→held→release M chain locks; the shot must show the persistent
+     * state line (tick past the 2 s flash), and the release after the hold
+     * must not re-toggle the lock */
+    key(KEY_PTT);                           /* save BYRON → LIST */
+    key(KEY_STAR);
+    release(KEY_STAR);                      /* * short → SCAN */
+    ticks(200);                             /* any flash expires before the negative check */
+    render();                               /* the frame must be current, not the editor's */
+    expect(!line_has_ink(6, 40, 90), "keylock: unlocked SCAN has no lock text");
+    key(KEY_MENU);                          /* press... */
+    held(KEY_MENU);                         /* ...hold → KEYLOCK */
+    release_held(KEY_MENU);                 /* release after the hold: consumed */
+    expect(gEeprom.KEY_LOCK, "keylock: M held sets KEY_LOCK");
+    ticks(200);                             /* the KEYLOCK flash expires */
+    shot("19-keylock", true);
+    /* strip 6 = framebuffer row 5 = the state line; "KEYLOCK" spans
+     * x≈9–58, while the unlocked "SCAN" stops at x≈37 — so ink in 40–90
+     * proves the persistent lock branch rendered */
+    expect(line_has_ink(6, 40, 90), "keylock: the persistent state line reads KEYLOCK");
+    key(KEY_MENU);                          /* press... */
+    held(KEY_MENU);                         /* ...hold → unlock */
+    release_held(KEY_MENU);
+    expect(!gEeprom.KEY_LOCK, "keylock: M held again clears KEY_LOCK, release keeps it off");
+
     /* 13. NO PACK boot (a failing EEPROM: even the demo install fails) */
     SIM_EEPROM_Reset();
     SIM_EEPROM_SetReadOnly(true);
     PACK_Init();
     SCAN01_UI_Init();
-    shot("19-nopack", true);
+    shot("20-nopack", true);
     expect(!PACK_IsValid(), "nopack: no valid pack");
     expect(line_has_ink(2, 30, 100) || line_has_ink(3, 30, 100),
            "nopack: the NO PACK line renders");

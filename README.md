@@ -9,7 +9,8 @@ scanning the moment it powers on. It is a specialized edition of the
 F4HWN v4.3 firmware (a fork of egzumer's UV-K5 firmware), vendored at
 the root of this repository.
 
-The firmware is in active development. There are no releases yet; see
+The firmware is in active development. There are no stable releases yet
+(weekly test builds ship as the rolling user-testing release); see
 [Project status](#project-status) for what works today.
 
 ### Why Scan 01
@@ -53,7 +54,8 @@ budget and 16 KB of RAM.
 | ---- | ----- |
 | T1 — edition scaffold | Done — `scan01.packed.bin` builds, 3.8 KB flash headroom |
 | T2 — band-lock (`PACK_FreqAllowed`) | Done — 815,004 host checks, 0 failures |
-| T3–T10 — pack layer, screens, capture, packtool | Pending |
+| T3–T8 — pack layer, racing font, key layer, Scan 01 UI (BRD/WX/SETUP/editor), capture, packtool | Done |
+| P2 — scan engine (tone-lock, FOLLOW, CSQ guard) + scan01 racing pack | Done — engine shipped; race-packs data awaits community verification |
 
 The task list is [spec/p1-pack-eeprom/tasks.md](spec/p1-pack-eeprom/tasks.md);
 the scan-engine spec is [spec/p2-scan-engine/](spec/p2-scan-engine/).

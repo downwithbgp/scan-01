@@ -181,6 +181,18 @@ static const PackCar_t *CarByNumber(const char *number)
     return NULL;
 }
 
+/* the my-driver car index — the FOLLOW target — or 0xFF when unset */
+static uint8_t FindFollowCar(void)
+{
+    const char *driver = PACK_MyDriver();
+    if (driver == NULL || driver[0] == 0)
+        return 0xFF;
+    for (uint8_t i = 0; i < PACK_CarCount(); i++)
+        if (strcmp(PACK_GetCar(i)->number, driver) == 0)
+            return i;
+    return 0xFF;
+}
+
 static bool CarLocked(const PackCar_t *car)
 {
     const uint8_t *bitmap = PACK_LockoutBitmap();
@@ -205,15 +217,7 @@ static void StartScan(void)
         return;
     }
     /* the scan engine (P2): rebuild the universe + walk it */
-    uint8_t follow = 0xFF;
-    const char *driver = PACK_MyDriver();
-    if (driver != NULL && driver[0] != 0)
-        for (uint8_t i = 0; i < PACK_CarCount(); i++)
-            if (strcmp(PACK_GetCar(i)->number, driver) == 0) {
-                follow = i;
-                break;
-            }
-    SCAN01_SCAN_Rebuild(follow);
+    SCAN01_SCAN_Rebuild(FindFollowCar());
     SCAN01_SCAN_Start();
     SetState(S1_ST_SCAN);
 }
@@ -760,7 +764,9 @@ static void HandleEditKey(KEY_Code_t key, bool bKeyPressed, bool bKeyHeld)
         gUpdateDisplay = true;
         return;
     }
-    if (SCAN01_EDIT_ProcessKey(key))
+    /* only presses drive the multi-tap engine — the base's release event
+     * must not advance the letter a second time */
+    if (bKeyPressed && SCAN01_EDIT_ProcessKey(key))
         gUpdateDisplay = true;
 }
 
@@ -825,6 +831,11 @@ void SCAN01_UI_ProcessKeys(KEY_Code_t key, bool bKeyPressed, bool bKeyHeld)
         }
         break;
     case SCAN01_ACT_CAPTURE:                /* long-PTT: catch it from the air */
+        if (gEeprom.KEY_LOCK) {
+            Flash("KEYLOCK");               /* a locked radio must not mutate the pack */
+            gUpdateDisplay = true;          /* the refusal must be visible */
+            break;
+        }
         if (g_st == S1_ST_BRD) {
             g_capture_freq = (uint32_t)gEeprom.FM_FrequencyPlaying * 100000u;
             FM_TurnOff();                   /* the form must be audible: back to the BK4819 */
@@ -943,15 +954,7 @@ void SCAN01_UI_ProcessKeys(KEY_Code_t key, bool bKeyPressed, bool bKeyHeld)
         break;
     case SCAN01_ACT_GROUP: {                 /* F2: cycle the scan group */
         SCAN01_SCAN_CycleGroup();
-        uint8_t follow = 0xFF;
-        const char *driver = PACK_MyDriver();
-        if (driver != NULL && driver[0] != 0)
-            for (uint8_t i = 0; i < PACK_CarCount(); i++)
-                if (strcmp(PACK_GetCar(i)->number, driver) == 0) {
-                    follow = i;
-                    break;
-                }
-        SCAN01_SCAN_Rebuild(follow);
+        SCAN01_SCAN_Rebuild(FindFollowCar());
         const char *name = "ALL";
         switch (SCAN01_SCAN_GetGroup()) {
         case SCAN01_GROUP_A: name = "A"; break;
@@ -992,7 +995,14 @@ void SCAN01_UI_ProcessKeys(KEY_Code_t key, bool bKeyPressed, bool bKeyHeld)
             SetupValueChange(-1);
         break;
     case SCAN01_ACT_KEYLOCK:
-        Flash("KEYLOCK T6C");
+        /* real key lock: while gEeprom.KEY_LOCK is set the base's ProcessKey
+         * gate (app.c) rejects every key except held M (the unlock gesture),
+         * PTT, and the side keys — HOLD and mute keep working while locked,
+         * CAPTURE is refused below */
+        gEeprom.KEY_LOCK = !gEeprom.KEY_LOCK;
+        SETTINGS_SaveSettings();
+        Flash(gEeprom.KEY_LOCK ? "KEYLOCK" : "UNLOCKED");
+        gUpdateDisplay = true;
         break;
     case SCAN01_ACT_BACK:
         if (g_st == S1_ST_SETUP)
@@ -1144,9 +1154,15 @@ static void RenderListen(void)
     if (g_flash_10ms > 0) {
         PrintSmallAt(5, 9, g_flash);
     } else if (g_st == S1_ST_HOLD) {
-        snprintf(state, sizeof(state), "HOLD %s", (car != NULL) ? car->number : (station != NULL ? station->name : ""));
+        if (gEeprom.KEY_LOCK)
+            snprintf(state, sizeof(state), "HOLD %s LOCK", (car != NULL) ? car->number : (station != NULL ? station->name : ""));
+        else
+            snprintf(state, sizeof(state), "HOLD %s", (car != NULL) ? car->number : (station != NULL ? station->name : ""));
         DrawGlyph(5, 0, GLYPH_HOLD);
         PrintSmallAt(5, 9, state);
+    } else if (gEeprom.KEY_LOCK) {
+        DrawGlyph(5, 0, GLYPH_SCAN);
+        PrintSmallAt(5, 9, "KEYLOCK");
     } else if (PACK_IsPractice()) {
         DrawGlyph(5, 0, GLYPH_SCAN);
         PrintSmallAt(5, 9, "PRACTICE");
@@ -1280,7 +1296,11 @@ static void RenderIdentity(void)
     } else {
         snprintf(line, 19, "%s — %s", PACK_Track(), PACK_Session());   /* ≤ 18 for 7px centering */
         UI_PrintString(line, 0, 127, 1, 7);
-        snprintf(line, sizeof(line), "%u cars · %s", (unsigned)PACK_CarCount(), PACK_Series());
+        /* the demo pack is stations-only, so count what is actually scanned */
+        if (PACK_CarCount() > 0)
+            snprintf(line, sizeof(line), "%u cars · %s", (unsigned)PACK_CarCount(), PACK_Series());
+        else
+            snprintf(line, sizeof(line), "%u st · %s", (unsigned)PACK_StationCount(), PACK_Series());
         PrintSmall(3, line, true);
     }
 
@@ -1398,5 +1418,14 @@ void SCAN01_UI_Init(void)
     g_setup_focus = 0;
     g_capture_tone_index = 0;
     g_capture_code_type = PACK_CT_NONE;
+    if (PACK_IsDemo()) {
+        /* factory-default boot: the demo pack was just installed — either a
+         * fresh radio or a corrupted-pack recovery (PACK_Init resets g_demo
+         * every boot, so later boots load the demo pack as a normal pack and
+         * never touch this). The Scan 01 personality is quiet (vision §3.5);
+         * the recovery path restoring the quiet default is intentional. */
+        gEeprom.BEEP_CONTROL = 0;
+        SETTINGS_SaveSettings();
+    }
     SCAN01_KEYS_Init();
 }

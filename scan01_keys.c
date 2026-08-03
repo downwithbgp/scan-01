@@ -36,6 +36,10 @@
 #define TYPE_BUF_MAX         9       /* 3 int + point + 5 frac ("450.8875") */
 
 static Scan01UiState_t g_ui_state;
+static KEY_Code_t      g_deferred_key;     /* pressed key awaiting short/long
+                                              resolution (M, *, UP/DOWN in the
+                                              states where a hold changes the
+                                              action); KEY_INVALID = none */
 static bool            g_ptt_armed;        /* PTT down and hold timer running */
 static uint16_t        g_ptt_hold_10ms;
 static bool            g_ptt_capture_latch; /* hold expired → CAPTURE on release */
@@ -168,6 +172,7 @@ static bool TypeCycleSuffix(bool up)
 void SCAN01_KEYS_Init(void)
 {
     g_ui_state = SCAN01_UI_SCAN;
+    g_deferred_key = KEY_INVALID;
     g_ptt_armed = false;
     g_ptt_hold_10ms = 0;
     g_ptt_capture_latch = false;
@@ -185,6 +190,7 @@ void SCAN01_KEYS_SetUiState(Scan01UiState_t state)
 {
     bool leaving_capture = (g_ui_state == SCAN01_UI_CAPTURE && state != SCAN01_UI_CAPTURE);
     g_ui_state = state;
+    g_deferred_key = KEY_INVALID;           /* a state change aborts a deferred press */
     if (leaving_capture)
         SCAN01_TYPE_SetAutoCommit(true);    /* CAPTURE is the only off-switch (§4.5) */
     /* entering a new state aborts a pending entry and hold timer */
@@ -283,6 +289,10 @@ Scan01Action_t SCAN01_KEYS_ProcessKey(KEY_Code_t key, bool bKeyPressed, bool bKe
     if (key == KEY_INVALID)
         return SCAN01_ACT_NONE;
 
+    /* a press of any other key cancels a deferred short-press */
+    if (key != g_deferred_key)
+        g_deferred_key = KEY_INVALID;
+
     /* ---- PTT (press/release only from the base; our own hold timer) ---- */
     if (key == KEY_PTT) {
         if (bKeyPressed) {
@@ -314,6 +324,24 @@ Scan01Action_t SCAN01_KEYS_ProcessKey(KEY_Code_t key, bool bKeyPressed, bool bKe
         return (g_ui_state == SCAN01_UI_SCAN) ? SCAN01_ACT_HOLD : SCAN01_ACT_RESUME;
     }
 
+    /* ---- non-PTT keys: releases never act on their own. A clean release
+     * resolves a deferred short-press; a release-after-hold is consumed;
+     * every other release is the noise after a press that already acted.
+     * (The base delivers press → held(600 ms) → release; without this the
+     * release would re-fire the press or held action — double digits,
+     * double volume steps, and a lock that toggles itself back off.) */
+    if (!bKeyPressed) {
+        if (bKeyHeld)
+            return SCAN01_ACT_NONE;         /* release after a hold: consumed */
+        switch (g_deferred_key) {
+        case KEY_MENU:  g_deferred_key = KEY_INVALID; return SCAN01_ACT_SETUP;
+        case KEY_STAR:  g_deferred_key = KEY_INVALID; return SCAN01_ACT_SCAN;
+        case KEY_UP:
+        case KEY_DOWN:  g_deferred_key = KEY_INVALID; return SCAN01_ACT_LIST;
+        default:        return SCAN01_ACT_NONE;
+        }
+    }
+
     return HandleListeningKey(key, bKeyHeld);
 }
 
@@ -323,6 +351,7 @@ static Scan01Action_t HandleListeningKey(KEY_Code_t key, bool held)
 
     /* ---- held events ---- */
     if (held) {
+        g_deferred_key = KEY_INVALID;       /* the hold consumed the deferred press */
         if (g_ui_state == SCAN01_UI_SETUP) {
             /* held ▲▼ edits the focused value (vision §5.5: UP/DOWN + knob edit) */
             if (key == KEY_UP)
@@ -387,7 +416,10 @@ static Scan01Action_t HandleListeningKey(KEY_Code_t key, bool held)
         case KEY_DOWN:
             return TypeCycleSuffix(false) ? SCAN01_ACT_TYPE_UPDATE : SCAN01_ACT_NONE;
         case KEY_SIDE1:    return SCAN01_ACT_MUTE;       /* harmless mid-entry */
-        case KEY_MENU:  TypeCancel(); return SCAN01_ACT_SETUP;
+        case KEY_MENU:
+            TypeCancel();                   /* M abandons the entry on press */
+            g_deferred_key = KEY_MENU;      /* deferred: a hold means KEYLOCK */
+            return SCAN01_ACT_NONE;
         case KEY_SIDE2:    TypeCancel(); return SCAN01_ACT_GROUP;
         case KEY_F:     TypeCancel(); return SCAN01_ACT_FAVORITES;
         default:        return SCAN01_ACT_NONE;
@@ -421,11 +453,23 @@ static Scan01Action_t HandleListeningKey(KEY_Code_t key, bool held)
         TypeAppend((char)('0' + (key - KEY_0)));
         return SCAN01_ACT_TYPE_UPDATE;      /* typing starts */
     case KEY_STAR:
+        if (g_ui_state == SCAN01_UI_HOLD || g_ui_state == SCAN01_UI_LIST) {
+            g_deferred_key = KEY_STAR;      /* deferred: a hold means LOCKOUT */
+            return SCAN01_ACT_NONE;
+        }
         return SCAN01_ACT_SCAN;             /* printed label SCAN */
     case KEY_UP:
-        return (g_ui_state == SCAN01_UI_SCAN) ? SCAN01_ACT_LIST : SCAN01_ACT_NAV_UP;
+        if (g_ui_state == SCAN01_UI_SCAN) {
+            g_deferred_key = KEY_UP;        /* deferred: a hold means volume */
+            return SCAN01_ACT_NONE;
+        }
+        return SCAN01_ACT_NAV_UP;
     case KEY_DOWN:
-        return (g_ui_state == SCAN01_UI_SCAN) ? SCAN01_ACT_LIST : SCAN01_ACT_NAV_DOWN;
+        if (g_ui_state == SCAN01_UI_SCAN) {
+            g_deferred_key = KEY_DOWN;      /* deferred: a hold means volume */
+            return SCAN01_ACT_NONE;
+        }
+        return SCAN01_ACT_NAV_DOWN;
     case KEY_F:
         return SCAN01_ACT_FAVORITES;
     case KEY_SIDE1:
@@ -433,7 +477,8 @@ static Scan01Action_t HandleListeningKey(KEY_Code_t key, bool held)
     case KEY_SIDE2:
         return SCAN01_ACT_GROUP;
     case KEY_MENU:
-        return (g_ui_state == SCAN01_UI_SETUP) ? SCAN01_ACT_BACK : SCAN01_ACT_SETUP;
+        g_deferred_key = KEY_MENU;          /* deferred: a hold means KEYLOCK */
+        return SCAN01_ACT_NONE;
     case KEY_EXIT:
         return (g_ui_state == SCAN01_UI_SETUP) ? SCAN01_ACT_BACK :
                (g_ui_state == SCAN01_UI_SCAN)  ? SCAN01_ACT_NONE : SCAN01_ACT_SCAN;
