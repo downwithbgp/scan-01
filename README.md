@@ -107,8 +107,11 @@ Host tests (band-lock, pack layer):
     $ python3 -m pytest tests/test_packtool_*.py -q   # packtool (48 tests)
 
 The packtool (packtool/) turns community frequency data into firmware
-bytes: `python3 -m packtool.cli validate|build|diff|import|compose|dump|flash|overlay`.
+bytes: `python3 -m packtool.cli validate|build|diff|import|compose|dump|flash|overlay|card`.
 The overlay prints the honest-face keypad sheet (`packtool overlay`);
+`card` prints the weekend quick card — the pack's cars as number → driver,
+pencil blanks (MY DRIVER / FAVORITES / GROUP), stations, and the seven
+rules (the writable-strip tradition: the manual ships with the pack);
 `build --teach` marks a pack so the radio teaches itself (the fading
 legend, scan01_lessons.c) instead of arriving quiet.
 Its golden test proves the pack JSON <-> EEPROM round-trip byte-for-byte

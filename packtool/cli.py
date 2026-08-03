@@ -1,10 +1,11 @@
 # Scan 01 — packtool: the CLI
-"""validate / build / diff / dump / flash / import / compose / overlay.
+"""validate / build / diff / dump / flash / import / compose / overlay / card.
 
     packtool validate pack.json
     packtool build pack.json -o pack.patch        # region list for flashing
     packtool build --teach pack.json              # a pack that teaches (lessons unlearned)
     packtool overlay -o overlay.svg               # the honest-face keypad sheet
+    packtool card pack.json -o card.svg           # the weekend quick card (writable)
     packtool diff a.json b.json
     packtool dump --port /dev/ttyUSB0 -o pack.json
     packtool dump --image eeprom.bin -o pack.json # offline
@@ -20,10 +21,23 @@ import json
 import sys
 
 from . import binary
+from .card import card_svg
 from .compose import compose_from_file
 from .importers.indyspeedway import import_text
 from .model import Pack, ValidationError, validate
 from .overlay import OVERLAY_SVG
+
+
+def cmd_card(args) -> int:
+    """Write the weekend quick card: the pack's cars as number → driver,
+    pencil blanks (MY DRIVER / FAVORITES / GROUP), the stations, and the
+    seven rules — the writable-strip tradition, one printable page."""
+    pack = Pack.load(args.pack)
+    with open(args.output, "w") as f:
+        f.write(card_svg(pack))
+    print(f"wrote {args.output}: {len(pack.cars)} cars, "
+          f"{len(pack.stations)} stations, one page")
+    return 0
 
 
 def cmd_overlay(args) -> int:
@@ -191,6 +205,11 @@ def main(argv=None) -> int:
     sp = sub.add_parser("overlay", help="write the printable keypad overlay (SVG)")
     sp.add_argument("-o", "--output", default="overlay.svg")
     sp.set_defaults(fn=cmd_overlay)
+
+    sp = sub.add_parser("card", help="write the weekend quick card (SVG)")
+    sp.add_argument("pack")
+    sp.add_argument("-o", "--output", default="card.svg")
+    sp.set_defaults(fn=cmd_card)
 
     sp = sub.add_parser("diff", help="diff two pack JSONs")
     sp.add_argument("a")
