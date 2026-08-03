@@ -331,10 +331,14 @@ CFLAGS += -Wextra
 # ---- SCAN01 EDITION (must be after the 'CFLAGS =' reset) ----
 ifeq ($(EDITION_STRING),Scan01)
 	CFLAGS += -DENABLE_FEAT_SCAN01
-	# the packed label the bootloader and web flashers display — Scan 01's
-	# own product version (v0.1), not the F4HWN lineage's
+	# the product's own version — one version per device: the packed boot
+	# label and the SETUP Info page both report it (the F4HWN v4.3 lineage
+	# stays in the UART string and the NOTICE)
+	SCAN01_VERSION := v0.1
+	CFLAGS += -DSCAN01_VERSION_STRING=\"$(SCAN01_VERSION)\"
+	# the packed label the bootloader and web flashers display
 	PACKED_NAME := Scan01
-	PACKED_VERSION := v0.1
+	PACKED_VERSION := $(SCAN01_VERSION)
 endif
 
 CFLAGS += -DPRINTF_INCLUDE_CONFIG_H

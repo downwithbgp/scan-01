@@ -92,7 +92,7 @@ def golden_image():
 def test_golden_parse(golden_image):
     """The packtool reads the firmware-written image exactly."""
     pack = binary.parse(golden_image)
-    assert pack.meta["series"] == "SCAN01"
+    assert pack.meta["series"] == "SCAN 01"   # the demo's screen-display brand
     assert [c.number for c in pack.cars] == ["24", "48", "3"]
     c24 = pack.cars[0]
     assert c24.freqs == [450.8875] and c24.tone == 94.8 and c24.favorite

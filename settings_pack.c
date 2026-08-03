@@ -323,7 +323,8 @@ static void pack_install_demo(void)
     g_lessons = 0;                      /* a fresh radio has everything to learn */
     g_car_count = 0;
     g_station_count = (uint8_t)DEMO_STATION_COUNT;
-    strcpy(g_series, "SCAN01  ");
+    strcpy(g_series, "SCAN 01 ");       /* the brand on the identity card — the
+                                         * screen display form (prose: "Scan 01") */
     strcpy(g_track, "DAILY   ");
     strcpy(g_session, "DEMO    ");
     memset(g_venue2, ' ', 8); g_venue2[8] = 0;

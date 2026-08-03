@@ -39,6 +39,12 @@
 #include "ui/status.h"
 #include "helper/battery.h"
 
+/* the product's own version — set by the scan01 build (Makefile, matching
+ * the packed boot label); the sim falls back to the lineage version */
+#ifndef SCAN01_VERSION_STRING
+#define SCAN01_VERSION_STRING VERSION_STRING
+#endif
+
 /* ---- internal states (a subset of the key layer's; BRD/WX/SETUP = T6b) ---- */
 typedef enum {
     S1_ST_SCAN = 0,
@@ -711,7 +717,10 @@ static void RenderSetup(void)
         break;
     default:                            /* Info */
         PrintSmall(0, "INFO 4/4", false);
-        SetupRenderRow(1, "SCAN 01 " VERSION_STRING, NULL, false);
+        /* one version per device: the product's own (the boot label and the
+         * Info page agree); the F4HWN lineage stays in the UART string and
+         * the NOTICE */
+        SetupRenderRow(1, "SCAN 01 " SCAN01_VERSION_STRING, NULL, false);
         snprintf(num, sizeof(num), "%u%%", (unsigned)BATTERY_VoltsToPercent(gBatteryVoltageAverage));
         snprintf(line, sizeof(line), "BATTERY: %s", num);
         SetupRenderRow(2, line, NULL, false);
